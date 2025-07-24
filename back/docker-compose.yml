@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:9000"
+    volumes:
+      - .:/var/www/html
+    environment:
+      - APP_ENV=local
+      - DB_HOST=127.0.0.1
+      - DB_CONNECTION=mysql
+      - DB_DATABASE=code_review
+      - DB_USERNAME=root
+      - DB_PASSWORD=
+    depends_on:
+      - db
+      - websockets
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=secret
+      - MYSQL_DATABASE=code_review
+    volumes:
+      - db-data:/var/lib/mysql
+  websockets:
+    image: beyondcode/laravel-websockets
+    ports:
+      - "6001:6001"
+    environment:
+      - LARAVEL_WEBSOCKETS_SSL_LOCAL_CERT=/path/to/cert.pem
+      - LARAVEL_WEBSOCKETS_SSL_LOCAL_PK=/path/to/key.pem
+volumes:
+  db-data:
