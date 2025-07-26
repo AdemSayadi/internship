@@ -131,7 +131,12 @@ const router = createRouter({
             path: '/auth/error',
             name: 'error',
             component: () => import('@/views/pages/auth/Error.vue')
-        }
+        },
+      {
+        path: '/index',
+        name: 'index',
+        component: () => import('@/views/pages/Index.vue')
+      }
     ]
 });
 
