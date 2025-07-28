@@ -132,8 +132,8 @@ const router = createRouter({
             name: 'error',
             component: () => import('@/views/pages/auth/Error.vue')
         },
-      
-      
+
+
      {
         path: '/index',
         name: 'index',
@@ -149,6 +149,25 @@ const router = createRouter({
         name: 'signup',
         component: () => import('@/views/CustomPages/Signup.vue')
       },
+
+        { path: '/repositories',
+            name: 'repositories',
+            component: () => import('@/views/CustomPages/Repositories.vue')
+        },
+        { path: '/submissions/:id',
+            name: 'submissions',
+            component: () => import('@/views/CustomPages/Submissions.vue')
+        },
+
+        { path: '/reviews/:id',
+            name: 'reviews',
+            component: () => import('@/views/CustomPages/Reviews.vue')
+        },
+        { path: '/notifications',
+            name: 'notifications',
+            component: () => import('@/views/CustomPages/Notifications.vue')
+        }
+
     ]
 });
 
