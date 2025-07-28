@@ -4,7 +4,7 @@ import PrimeUI from 'tailwindcss-primeui';
 export default {
     darkMode: ['selector', '[class*="app-dark"]'],
     content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-    plugins: [PrimeUI],
+    plugins: [PrimeUI,'@tailwindcss/forms'],
     theme: {
         screens: {
             sm: '576px',
