@@ -132,11 +132,23 @@ const router = createRouter({
             name: 'error',
             component: () => import('@/views/pages/auth/Error.vue')
         },
-      {
+      
+      
+     {
         path: '/index',
         name: 'index',
-        component: () => import('@/views/pages/Index.vue')
-      }
+        component: () => import('@/views/CustomPages/Index.vue')
+      },
+      {
+        path: '/auth/login1',
+        name: 'login',
+        component: () => import('@/views/CustomPages/Login.vue')
+      },
+      {
+        path: '/auth/signup1',
+        name: 'signup',
+        component: () => import('@/views/CustomPages/Signup.vue')
+      },
     ]
 });
 

@@ -18,7 +18,7 @@ class AuthController extends Controller
             Log::info('Registration attempt', ['request_data' => $request->all()]);
 
             // Validate request
-            $validator = Validator::make($request->all(), [
+            $validator = Validator::make($request->json()->all(), [
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8|confirmed',
@@ -33,11 +33,14 @@ class AuthController extends Controller
                 ], 422);
             }
 
+            Log::info('Register request data', $request->all());
             // Create user
+            $data = $request->json()->all();
+
             $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
             ]);
 
             Log::info('User created successfully', ['user_id' => $user->id]);
@@ -77,11 +80,14 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
-
+            $data = $request->json()->all();
+                if (empty($data)) {
+                    $data = $request->all();
+                }
+            $validator = Validator::make($data, [
+                    'email' => 'required|email',
+                    'password' => 'required',
+                ]);
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
