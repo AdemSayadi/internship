@@ -63,16 +63,20 @@
 
                 <div class="mt-10 flex justify-center">
                     <Button
-                        label="Add Repository"
-                        icon="pi pi-plus"
-                        class="group relative overflow-hidden rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all duration-300 ease-out transform hover:scale-105"
+                        class="group relative inline-flex items-center justify-center min-w-[160px] gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-md shadow-lg hover:shadow-xl transition-all duration-300 ease-out transform hover:scale-105"
                         @click="showDialog = true"
                         @mouseenter="onButtonHover"
                         @mouseleave="onButtonLeave"
                         :class="{ 'animate-bounce': buttonHovered }"
                     >
+                        <!-- Icon manually added here -->
+                        <i class="pi pi-plus text-white relative z-10"></i>
+                        <span class="relative z-10">Add Repository</span>
+
+                        <!-- Hover overlay -->
                         <div class="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </Button>
+
                 </div>
 
                 <Dialog v-model:visible="showDialog" header="Add Repository" modal class="w-full max-w-md">

@@ -154,12 +154,12 @@ const router = createRouter({
             name: 'repositories',
             component: () => import('@/views/CustomPages/Repositories.vue')
         },
-        { path: '/submissions/:id',
+        { path: '/submissions/:repositoryId',
             name: 'submissions',
             component: () => import('@/views/CustomPages/Submissions.vue')
         },
 
-        { path: '/reviews/:id',
+        { path: '/reviews/:submissionId',
             name: 'reviews',
             component: () => import('@/views/CustomPages/Reviews.vue')
         },

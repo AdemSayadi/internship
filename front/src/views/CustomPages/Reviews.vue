@@ -185,7 +185,7 @@ const fetchSubmission = () => {
     submission.value = mockSubmissions.find((sub) => sub.id === subId) || null;
     if (!submission.value) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Submission not found', life: 3000 });
-        router.push('/repositories');
+        // router.push('/repositories');
         return;
     }
     submission.value.reviews = mockReviews.filter((review) => review.code_submission_id === subId);
