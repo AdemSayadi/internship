@@ -1,5 +1,6 @@
 import AppLayout from '@/layout/AppLayout.vue';
 import { createRouter, createWebHistory } from 'vue-router';
+import Login from '@/views/CustomPages/Login.vue';
 
 const router = createRouter({
     history: createWebHistory(),
@@ -134,23 +135,24 @@ const router = createRouter({
         },
 
 
-     {
-        path: '/index',
-        name: 'index',
-        component: () => import('@/views/CustomPages/Index.vue')
-      },
-      {
-        path: '/auth/login1',
-        name: 'login',
-        component: () => import('@/views/CustomPages/Login.vue')
-      },
-      {
-        path: '/auth/signup1',
-        name: 'signup',
-        component: () => import('@/views/CustomPages/Signup.vue')
-      },
+        {
+            path: '/index',
+            name: 'index',
+            component: () => import('@/views/CustomPages/Index.vue')
+        },
+        {
+            path: '/auth/login1',
+            name: 'login',
+            component: () => import('@/views/CustomPages/Login.vue')
+        },
+        {
+            path: '/auth/signup1',
+            name: 'signup',
+            component: () => import('@/views/CustomPages/Signup.vue')
+        },
 
-        { path: '/repositories',
+        {
+            path: '/repositories',
             name: 'repositories',
             component: () => import('@/views/CustomPages/Repositories.vue')
         },
@@ -169,6 +171,18 @@ const router = createRouter({
         }
 
     ]
+})
+// Add navigation guard
+router.beforeEach((to, from, next) => {
+    const publicPages = ['/auth/login1', '/auth/register'];
+    const authRequired = !publicPages.includes(to.path);
+    const loggedIn = localStorage.getItem('token');
+
+    if (authRequired && !loggedIn) {
+        return next('/auth/login1');
+    }
+
+    next();
 });
 
 export default router;

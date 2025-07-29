@@ -165,6 +165,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Navbar from '@/components/CustomComponents/Navbar.vue';
 import Footer from '@/components/CustomComponents/Footer.vue';
+import {useAuth} from "@/router/composables/useAuth";
 
 // Animation and reactive data
 const isLoaded = ref(false);
@@ -272,8 +273,12 @@ const deleteSubmission = (id) => {
     toast.add({ severity: 'success', summary: 'Success', detail: 'Submission deleted', life: 3000 });
 };
 
+const { checkAuth } = useAuth();
 // Lifecycle
 onMounted(() => {
+    if (!checkAuth()) {
+        router.push('/auth/login1');
+    }
     generateParticles();
     setTimeout(() => {
         isLoaded.value = true;
