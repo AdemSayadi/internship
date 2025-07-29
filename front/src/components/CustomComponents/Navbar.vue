@@ -30,7 +30,7 @@ const navigation = [
     { name: 'Submissions', href: '#' },
     { name: 'Code Reviews', href: '#' },
     { name: 'Notifications', href: '/notifications' },
-    { name: 'Dashboard', href: '#' },
+    { name: 'Dashboard', href: '/dashboard1' },
 ]
 </script>
 

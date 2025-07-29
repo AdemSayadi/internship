@@ -168,6 +168,11 @@ const router = createRouter({
         { path: '/notifications',
             name: 'notifications',
             component: () => import('@/views/CustomPages/Notifications.vue')
+        },
+        {
+            path: '/dashboard1',
+            name: 'dashboard',
+            component: () => import('@/views/CustomPages/Dashboard.vue')
         }
 
     ]
