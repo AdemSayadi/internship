@@ -7,6 +7,7 @@ use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\CodeSubmissionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\NotificationController;
+use Illuminate\Http\Middleware\HandleCors;
 
 /*
 |--------------------------------------------------------------------------

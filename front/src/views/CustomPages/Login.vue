@@ -52,7 +52,7 @@
             <div v-if="error" class="text-red-600 text-center mb-2">{{ error }}</div>
             <button v-if="loading" disabled class="w-full mt-2 bg-gray-400 text-white py-2 rounded-md font-semibold">Loading...</button>
           </div>
-          
+
           <form @submit.prevent="onSubmit">
             <input v-model="form.email" type="email" placeholder="Email" class="w-full mb-4 px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" required />
             <input v-model="form.password" type="password" placeholder="Password" class="w-full mb-4 px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" required />
@@ -82,6 +82,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import Navbar from '@/components/CustomComponents/Navbar.vue'
 import Footer from '@/components/CustomComponents/Footer.vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
 // DOM ref for title element
 const titleEl = ref(null)
@@ -112,24 +114,40 @@ const loading = ref(false)
 const onSubmit = async () => {
     error.value = ''
     loading.value = true
+
     try {
-        const response = await fetch('http://localhost:8000/api/login', {
+        const response = await fetch('http://localhost:8000/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(form.value)
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(form.value),
         })
+
         const data = await response.json()
+        console.log('Login response:', data)
+
         if (!response.ok) {
-            error.value = data.message || 'Login failed'
-        } else {
-            // Store token for authenticated requests
-            localStorage.setItem('token', data.access_token)
-            router.push('/') // or wherever you want to redirect
+            throw new Error(data.message || 'Login failed')
         }
-    } catch (e) {
-        error.value = 'Network error'
+
+        // Store token and redirect
+        localStorage.setItem('token', data.access_token)
+
+        // Ensure router is available
+        if (router) {
+            await router.push('/repositories')
+        } else {
+            window.location.href = '/repositories'
+        }
+
+    } catch (err) {
+        console.error('Login error:', err)
+        error.value = err.message || 'Network error. Please try again.'
+    } finally {
+        loading.value = false
     }
-    loading.value = false
 }
 
 const goToGitHub = () => {

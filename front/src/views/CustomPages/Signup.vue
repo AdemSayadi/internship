@@ -48,7 +48,7 @@
           </h2>
           <h3 class="text-xl text-center mb-6 text-gray-600">Sign Up</h3>
             <div v-if="error" class="text-red-600 text-center mb-2">{{ error }}</div>
-           <div class="mb-5" text-center> 
+           <div class="mb-5 text-center">
                 <div v-if="error" class="text-red-600 text-center mb-2">{{ error }}</div>
 <button v-if="loading" disabled class="w-full mt-2 bg-gray-400 text-white py-2 rounded-md font-semibold">Loading...</button>
             </div>
@@ -83,6 +83,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import Navbar from '@/components/CustomComponents/Navbar.vue'
 import Footer from '@/components/CustomComponents/Footer.vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
 
 // DOM ref for title element
 const titleEl = ref(null)
@@ -126,7 +128,7 @@ const onSubmit = async () => {
             error.value = data.message || 'Registration failed'
         } else {
             // Optionally store token: localStorage.setItem('token', data.access_token)
-            router.push('/auth/login1')
+            await router.push('/auth/login1')
         }
     } catch (e) {
         error.value = 'Network error'
