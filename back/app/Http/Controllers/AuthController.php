@@ -81,13 +81,26 @@ class AuthController extends Controller
     {
         try {
             $data = $request->json()->all();
-                if (empty($data)) {
-                    $data = $request->all();
-                }
+
+            // Fallback if JSON is empty
+            if (empty($data)) {
+                $data = $request->all();
+            }
+
+            Log::debug('Login attempt data', $data);
+
+            if (empty($data)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No login data provided',
+                ], 400);
+            }
+
             $validator = Validator::make($data, [
-                    'email' => 'required|email',
-                    'password' => 'required',
-                ]);
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
+
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -96,9 +109,9 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            $user = User::where('email', $request->email)->first();
+            $user = User::where('email', $data['email'])->first();
 
-            if (!$user || !Hash::check($request->password, $user->password)) {
+            if (!$user || !Hash::check($data['password'], $user->password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials'
