@@ -56,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('notifications/clear-read', [NotificationController::class, 'clearRead']);
 
     // Dashboard/Statistics routes
-    Route::prefix('dashboard')->group(function () {
+    Route::prefix('Dashboard')->group(function () {
         Route::get('/stats', function () {
             return response()->json([
                 'success' => true,

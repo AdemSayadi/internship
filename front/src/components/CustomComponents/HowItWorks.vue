@@ -275,7 +275,7 @@ const steps = ref([
     {
         id: 1,
         title: 'User Onboarding & Authentication',
-        description: 'Visit the CodeGuard AI platform, register or log in using Laravel Sanctum + Vue Auth, and access your personalized dashboard with a secure JWT token for API authentication.',
+        description: 'Visit the CodeGuard AI platform, register or log in using Laravel Sanctum + Vue Auth, and access your personalized Dashboard with a secure JWT token for API authentication.',
         iconBg: 'bg-indigo-200',
         iconColor: 'text-indigo-700',
         iconHoverBg: 'bg-indigo-300',

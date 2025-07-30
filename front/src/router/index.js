@@ -1,6 +1,6 @@
 import AppLayout from '@/layout/AppLayout.vue';
 import { createRouter, createWebHistory } from 'vue-router';
-import Login from '@/views/CustomPages/Login.vue';
+import Login from '@/views/CustomPages/Auth/Login.vue';
 
 const router = createRouter({
     history: createWebHistory(),
@@ -11,7 +11,7 @@ const router = createRouter({
             children: [
                 {
                     path: '/',
-                    name: 'dashboard',
+                    name: 'Dashboard',
                     component: () => import('@/views/Dashboard.vue')
                 },
                 {
@@ -143,12 +143,12 @@ const router = createRouter({
         {
             path: '/auth/login1',
             name: 'login',
-            component: () => import('@/views/CustomPages/Login.vue')
+            component: () => import('@/views/CustomPages/Auth/Login.vue')
         },
         {
             path: '/auth/signup1',
             name: 'signup',
-            component: () => import('@/views/CustomPages/Signup.vue')
+            component: () => import('@/views/CustomPages/Auth/Signup.vue')
         },
 
         {
@@ -170,9 +170,9 @@ const router = createRouter({
             component: () => import('@/views/CustomPages/Notifications.vue')
         },
         {
-            path: '/dashboard1',
-            name: 'dashboard',
-            component: () => import('@/views/CustomPages/Dashboard.vue')
+            path: '/Dashboard',
+            name: 'dashboard2',
+            component: () => import('@/views/CustomPages/Dashboard/Dashboard.vue')
         }
 
     ]
