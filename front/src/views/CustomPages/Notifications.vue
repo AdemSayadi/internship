@@ -117,7 +117,7 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import Navbar from '@/components/CustomComponents/Navbar.vue';
 import Footer from '@/components/CustomComponents/Footer.vue';
-import { useAuth } from '@/router/composables/useAuth';
+import { useAuth } from '@/utils/composables/useAuth';
 
 // Animation and reactive data
 const isLoaded = ref(false);

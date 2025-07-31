@@ -83,6 +83,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import Navbar from '@/components/CustomComponents/Navbar.vue'
 import Footer from '@/components/CustomComponents/Footer.vue'
 import { useRouter } from 'vue-router'
+import {handleGitHubAuth} from "@/utils/auth";
 const router = useRouter()
 
 // DOM ref for title element
@@ -152,19 +153,10 @@ const onSubmit = async () => {
 
 const goToGitHub = async () => {
     try {
-        // Get the GitHub OAuth URL from your backend
-        const response = await fetch('http://localhost:8000/api/auth/github');
-        const data = await response.json();
-
-        if (data.url) {
-            // Redirect to GitHub OAuth
-            window.location.href = data.url;
-        } else {
-            throw new Error('Failed to get GitHub OAuth URL');
-        }
+        const { redirect } = await handleGitHubAuth();
+        await router.push(redirect || '/repositories');
     } catch (err) {
-        error.value = 'Failed to initiate GitHub login';
-        console.error(err);
+        error.value = err.message;
     }
 };
 

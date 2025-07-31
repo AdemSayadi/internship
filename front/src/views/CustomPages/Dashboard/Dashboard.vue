@@ -30,7 +30,7 @@ import DashboardHeader from '@/views/CustomPages/Dashboard/DashboardHeader.vue'
 import MetricsGrid from '@/views/CustomPages/Dashboard/MetricsGrid.vue'
 import MainContentGrid from '@/views/CustomPages/Dashboard/MainContentGrid.vue'
 import BottomRow from '@/views/CustomPages/Dashboard/BottomRow.vue'
-import {useAuth} from "@/router/composables/useAuth";
+import {useAuth} from "@/utils/composables/useAuth";
 import router from "@/router";
 
 const isLoaded = ref(false)

@@ -3,7 +3,7 @@ import { Dialog, DialogPanel } from "@headlessui/vue";
 import { Bars3Icon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useAuth } from "@/router/composables/useAuth";
+import { useAuth } from "@/utils/composables/useAuth";
 
 const router = useRouter();
 const mobileMenuOpen = ref(false);

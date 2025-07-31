@@ -174,6 +174,11 @@ const router = createRouter({
             path: '/dashboard',
             name: 'dashboard2',
             component: () => import('@/views/CustomPages/Dashboard/Dashboard.vue')
+        },
+        {
+            path: '/auth/github/callback',
+            name: 'GitHubCallback',
+            component: () => import('@/views/CustomPages/GitHubCallback.vue')
         }
 
     ]

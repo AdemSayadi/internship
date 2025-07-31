@@ -8,14 +8,6 @@
             />
         </div>
 
-        <!-- Animated Bottom Gradient -->
-        <div class="absolute inset-x-0 bottom-0 -z-10 transform-gpu overflow-hidden blur-3xl" aria-hidden="true">
-            <div
-                class="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[#9089fc] via-[#7c3aed] to-[#ff80b5] opacity-25 sm:left-[calc(50%+36rem)] sm:w-[72.1875rem] transition-all duration-1500 ease-in-out"
-                :style="{ transform: `rotate(${-rotation}deg) scale(${scale})` }"
-            />
-        </div>
-
         <!-- Floating particles -->
         <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
             <div
@@ -47,7 +39,6 @@
                         {{ displayedTitle }}<span class="animate-pulse">|</span>
                     </h2>
                     <h3 class="text-xl text-center mb-6 text-gray-600">Sign Up</h3>
-                    <div v-if="error" class="text-red-600 text-center mb-2">{{ error }}</div>
                     <div class="mb-5 text-center">
                         <div v-if="error" class="text-red-600 text-center mb-2">{{ error }}</div>
                         <button v-if="loading" disabled class="w-full mt-2 bg-gray-400 text-white py-2 rounded-md font-semibold">Loading...</button>
@@ -84,6 +75,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import Navbar from '@/components/CustomComponents/Navbar.vue'
 import Footer from '@/components/CustomComponents/Footer.vue'
 import { useRouter } from 'vue-router'
+import {handleGitHubAuth} from "@/utils/auth";
 const router = useRouter()
 
 // DOM ref for title element
@@ -138,17 +130,10 @@ const onSubmit = async () => {
 
 const goToGitHub = async () => {
     try {
-        const response = await fetch('http://localhost:8000/api/auth/github');
-        const data = await response.json();
-
-        if (data.url) {
-            window.location.href = data.url;
-        } else {
-            throw new Error('Failed to get GitHub OAuth URL');
-        }
+        const { redirect } = await handleGitHubAuth();
+        await router.push(redirect || '/repositories');
     } catch (err) {
-        error.value = 'Failed to initiate GitHub signup';
-        console.error(err);
+        error.value = err.message;
     }
 };
 

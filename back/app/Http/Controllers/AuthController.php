@@ -10,16 +10,15 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
     public function register(Request $request): JsonResponse
     {
         try {
-            // Log incoming request for debugging
             Log::info('Registration attempt', ['request_data' => $request->all()]);
 
-            // Validate request
             $validator = Validator::make($request->json()->all(), [
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
@@ -35,30 +34,18 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            Log::info('Register request data', $request->all());
-            // Create user
-            $data = $request->json()->all();
-
             $user = User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => Hash::make($data['password']),
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
             ]);
 
-            Log::info('User created successfully', ['user_id' => $user->id]);
-
-            // Create token
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
                 'message' => 'User registered successfully',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'created_at' => $user->created_at,
-                ],
+                'user' => $user->only(['id', 'name', 'email', 'created_at']),
                 'access_token' => $token,
                 'token_type' => 'Bearer',
             ], 201);
@@ -66,8 +53,6 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             Log::error('Registration error', [
                 'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -82,23 +67,7 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         try {
-            $data = $request->json()->all();
-
-            // Fallback if JSON is empty
-            if (empty($data)) {
-                $data = $request->all();
-            }
-
-            Log::debug('Login attempt data', $data);
-
-            if (empty($data)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No login data provided',
-                ], 400);
-            }
-
-            $validator = Validator::make($data, [
+            $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
@@ -111,9 +80,9 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            $user = User::where('email', $data['email'])->first();
+            $user = User::where('email', $request->email)->first();
 
-            if (!$user || !Hash::check($data['password'], $user->password)) {
+            if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials'
@@ -125,11 +94,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
+                'user' => $user->only(['id', 'name', 'email']),
                 'access_token' => $token,
                 'token_type' => 'Bearer',
             ]);
@@ -137,8 +102,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             Log::error('Login error', [
                 'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -172,75 +136,58 @@ class AuthController extends Controller
     {
         return response()->json([
             'success' => true,
-            'user' => [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'email' => $request->user()->email,
-                'github_id' => $request->user()->github_id,
-                'created_at' => $request->user()->created_at,
-            ]
-        ]);
-    }
-    /**
-     * Redirect to GitHub for authentication
-     */
-    public function redirectToGithub(): JsonResponse
-    {
-        return response()->json([
-            'url' => Socialite::driver('github')->stateless()->redirect()->getTargetUrl()
+            'user' => $request->user()->only([
+                'id', 'name', 'email', 'github_id', 'created_at'
+            ])
         ]);
     }
 
-    /**
-     * Handle GitHub callback
-     */
+    public function redirectToGithub(): JsonResponse
+    {
+        $redirectUrl = Socialite::driver('github')
+            ->scopes(['read:user', 'user:email', 'repo'])
+            ->stateless()
+            ->redirect()
+            ->getTargetUrl();
+
+        return response()->json([
+            'url' => $redirectUrl
+        ]);
+    }
+
     public function handleGithubCallback(Request $request): JsonResponse
     {
         try {
             $githubUser = Socialite::driver('github')->stateless()->user();
 
-            // Check if we have a valid GitHub user
             if (!$githubUser || !$githubUser->getEmail()) {
-                throw new \Exception('Invalid GitHub user data');
+                throw new \Exception('Could not retrieve GitHub user data');
             }
 
-            // Find existing user by GitHub ID
-            $user = User::where('github_id', $githubUser->getId())->first();
+            $user = User::firstOrCreate(
+                ['email' => $githubUser->getEmail()],
+                [
+                    'name' => $githubUser->getName() ?? $githubUser->getNickname(),
+                    'github_id' => $githubUser->getId(),
+                    'password' => null,
+                ]
+            );
 
-            if (!$user) {
-                // Check if user exists with this email (to link accounts)
-                $user = User::where('email', $githubUser->getEmail())->first();
-
-                if ($user) {
-                    // Update existing user with GitHub ID
-                    $user->github_id = $githubUser->getId();
-                    $user->save();
-                } else {
-                    // Create new user with GitHub data
-                    $user = User::create([
-                        'name' => $githubUser->getName() ?? $githubUser->getNickname(),
-                        'email' => $githubUser->getEmail(),
-                        'github_id' => $githubUser->getId(),
-                        'password' => null, // No password for GitHub users
-                    ]);
-                }
+            // Update github_id if user exists but wasn't connected
+            if (empty($user->github_id)) {
+                $user->github_id = $githubUser->getId();
+                $user->save();
             }
 
-            // Log in the user
-            Auth::login($user);
-            $token = $user->createToken('auth_token')->plainTextToken;
+            $token = $user->createToken('github_token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
                 'message' => 'GitHub authentication successful',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'github_id' => $user->github_id,
-                ],
+                'user' => $user->only(['id', 'name', 'email', 'github_id']),
                 'access_token' => $token,
                 'token_type' => 'Bearer',
+                'redirect_url' => '/repositories' // Frontend should handle this
             ]);
 
         } catch (\Exception $e) {
@@ -252,14 +199,12 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'GitHub authentication failed',
-                'error' => config('app.debug') ? $e->getMessage() : null
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'redirect_url' => '/login?github_error=1'
             ], 401);
         }
     }
 
-    /**
-     * Disconnect GitHub from user account
-     */
     public function disconnectGithub(Request $request): JsonResponse
     {
         try {
@@ -272,7 +217,6 @@ class AuthController extends Controller
                 ], 400);
             }
 
-            // If user has no password, require them to set one first
             if (!$user->password) {
                 return response()->json([
                     'success' => false,
@@ -298,9 +242,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Set password for GitHub-authenticated users
-     */
     public function setPassword(Request $request): JsonResponse
     {
         try {
@@ -318,7 +259,6 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            // Only allow password set if user doesn't have one
             if ($user->password) {
                 return response()->json([
                     'success' => false,
