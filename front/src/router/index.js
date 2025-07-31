@@ -134,7 +134,7 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Error.vue')
         },
 
-
+    //custom pages routes
         {
             path: '/index',
             name: 'index',
@@ -148,7 +148,8 @@ const router = createRouter({
         {
             path: '/auth/signup1',
             name: 'signup',
-            component: () => import('@/views/CustomPages/Auth/Signup.vue')
+            component: () => import('@/views/CustomPages/Auth/Signup.vue'),
+            meta: { requiresGuest: true }
         },
 
         {
@@ -170,7 +171,7 @@ const router = createRouter({
             component: () => import('@/views/CustomPages/Notifications.vue')
         },
         {
-            path: '/Dashboard',
+            path: '/dashboard',
             name: 'dashboard2',
             component: () => import('@/views/CustomPages/Dashboard/Dashboard.vue')
         }
@@ -179,7 +180,7 @@ const router = createRouter({
 })
 // Add navigation guard
 router.beforeEach((to, from, next) => {
-    const publicPages = ['/auth/login1', '/auth/register'];
+    const publicPages = ['/auth/login1', '/auth/signup1'];
     const authRequired = !publicPages.includes(to.path);
     const loggedIn = localStorage.getItem('token');
 

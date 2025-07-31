@@ -48,7 +48,7 @@
           </h2>
           <h3 class="text-xl text-center mb-6 text-gray-600">Login</h3>
 
-          <div class="mb-5" text-center>
+          <div class="mb-5 text-center">
             <div v-if="error" class="text-red-600 text-center mb-2">{{ error }}</div>
             <button v-if="loading" disabled class="w-full mt-2 bg-gray-400 text-white py-2 rounded-md font-semibold">Loading...</button>
           </div>
