@@ -24,6 +24,9 @@ use Illuminate\Http\Middleware\HandleCors;
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    // GitHub OAuth routes
+    Route::get('/github', [AuthController::class, 'redirectToGithub']);
+    Route::post('/github/callback', [AuthController::class, 'handleGithubCallback']);
 });
 
 // Protected routes requiring authentication
@@ -35,6 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
         Route::post('/logout-all', [AuthController::class, 'logoutAll']);
+        //Account Management
+        Route::delete('/github', [AuthController::class, 'disconnectGithub']);
+        Route::post('/password', [AuthController::class, 'setPassword']);
     });
 
     // Repository management
@@ -56,7 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('notifications/clear-read', [NotificationController::class, 'clearRead']);
 
     // Dashboard/Statistics routes
-    Route::prefix('Dashboard')->group(function () {
+    Route::prefix('dashboard')->group(function () {
         Route::get('/stats', function () {
             return response()->json([
                 'success' => true,

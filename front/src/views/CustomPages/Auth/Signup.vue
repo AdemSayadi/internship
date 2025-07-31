@@ -136,9 +136,21 @@ const onSubmit = async () => {
     loading.value = false
 }
 
-const goToGitHub = () => {
-    alert('Redirect to GitHub OAuth')
-}
+const goToGitHub = async () => {
+    try {
+        const response = await fetch('http://localhost:8000/api/auth/github');
+        const data = await response.json();
+
+        if (data.url) {
+            window.location.href = data.url;
+        } else {
+            throw new Error('Failed to get GitHub OAuth URL');
+        }
+    } catch (err) {
+        error.value = 'Failed to initiate GitHub signup';
+        console.error(err);
+    }
+};
 
 // Animated background
 const rotation = ref(30)
