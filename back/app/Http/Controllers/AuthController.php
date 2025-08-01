@@ -82,7 +82,23 @@ class AuthController extends Controller
 
             $user = User::where('email', $request->email)->first();
 
-            if (!$user || !Hash::check($request->password, $user->password)) {
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid credentials'
+                ], 401);
+            }
+
+            // Check if user has a password set (for GitHub-only users)
+            if (!$user->password) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account was created with GitHub. Please login with GitHub or set a password first.',
+                    'requires_github_login' => true
+                ], 401);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials'
@@ -155,7 +171,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function handleGithubCallback(Request $request): JsonResponse
+    public function handleGithubCallback(Request $request)
     {
         try {
             $githubUser = Socialite::driver('github')->stateless()->user();
@@ -181,14 +197,15 @@ class AuthController extends Controller
 
             $token = $user->createToken('github_token')->plainTextToken;
 
-            return response()->json([
-                'success' => true,
-                'message' => 'GitHub authentication successful',
-                'user' => $user->only(['id', 'name', 'email', 'github_id']),
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'redirect_url' => '/repositories' // Frontend should handle this
-            ]);
+            // For popup-based auth, redirect to callback page with success data
+            $callbackUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/github/callback';
+            $callbackUrl .= '?' . http_build_query([
+                    'success' => 'true',
+                    'token' => $token,
+                    'user' => json_encode($user->only(['id', 'name', 'email', 'github_id']))
+                ]);
+
+            return redirect($callbackUrl);
 
         } catch (\Exception $e) {
             Log::error('GitHub auth error', [
@@ -196,12 +213,13 @@ class AuthController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'GitHub authentication failed',
-                'error' => config('app.debug') ? $e->getMessage() : null,
-                'redirect_url' => '/login?github_error=1'
-            ], 401);
+            $callbackUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/github/callback';
+            $callbackUrl .= '?' . http_build_query([
+                    'success' => 'false',
+                    'error' => 'GitHub authentication failed'
+                ]);
+
+            return redirect($callbackUrl);
         }
     }
 

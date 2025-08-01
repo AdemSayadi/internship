@@ -26,7 +26,6 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     // GitHub OAuth routes
     Route::get('/github', [AuthController::class, 'redirectToGithub']);
-    Route::post('/github/callback', [AuthController::class, 'handleGithubCallback']);
 });
 
 // Protected routes requiring authentication
