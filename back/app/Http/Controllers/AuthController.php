@@ -263,9 +263,8 @@ class AuthController extends Controller
     public function setPassword(Request $request): JsonResponse
     {
         try {
-            $user = $request->user();
-
             $validator = Validator::make($request->all(), [
+                'email' => 'required|email',
                 'password' => 'required|string|min:8|confirmed',
             ]);
 
@@ -277,23 +276,50 @@ class AuthController extends Controller
                 ], 422);
             }
 
+            // Find user by email
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
             if ($user->password) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Password already set'
+                    'message' => 'Password already set. Please use the regular login.'
+                ], 400);
+            }
+
+            // Verify this is a GitHub user
+            if (!$user->github_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This feature is only available for GitHub users'
                 ], 400);
             }
 
             $user->password = Hash::make($request->password);
             $user->save();
 
+            // Create token for the user
+            $token = $user->createToken('password_set_token')->plainTextToken;
+
             return response()->json([
                 'success' => true,
-                'message' => 'Password set successfully'
+                'message' => 'Password set successfully',
+                'user' => $user->only(['id', 'name', 'email', 'github_id']),
+                'access_token' => $token,
+                'token_type' => 'Bearer',
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Set password error', ['message' => $e->getMessage()]);
+            Log::error('Set password error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to set password'

@@ -26,7 +26,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     // GitHub OAuth routes
     Route::get('/github', [AuthController::class, 'redirectToGithub']);
+    // NOTE: GitHub callback is handled in web.php, not here
 });
+
+// Public password setting for GitHub users (doesn't require authentication)
+Route::post('/auth/set-password', [AuthController::class, 'setPassword']);
 
 // Protected routes requiring authentication
 Route::middleware('auth:sanctum')->group(function () {
@@ -41,37 +45,37 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/github', [AuthController::class, 'disconnectGithub']);
         Route::post('/password', [AuthController::class, 'setPassword']);
     });
+});
 
-    // Repository management
-    Route::apiResource('repositories', RepositoryController::class);
-    Route::get('repositories/{repository}/submissions', [RepositoryController::class, 'submissions']);
+// Repository management
+Route::apiResource('repositories', RepositoryController::class);
+Route::get('repositories/{repository}/submissions', [RepositoryController::class, 'submissions']);
 
-    // Code submission management
-    Route::apiResource('code-submissions', CodeSubmissionController::class);
-    Route::get('code-submissions/{id}/reviews', [CodeSubmissionController::class, 'reviews']);
+// Code submission management
+Route::apiResource('code-submissions', CodeSubmissionController::class);
+Route::get('code-submissions/{id}/reviews', [CodeSubmissionController::class, 'reviews']);
 
-    // Review management
-    Route::apiResource('reviews', ReviewController::class);
-    Route::get('reviews/statistics', [ReviewController::class, 'statistics']);
+// Review management
+Route::apiResource('reviews', ReviewController::class);
+Route::get('reviews/statistics', [ReviewController::class, 'statistics']);
 
-    // Notification management
-    Route::apiResource('notifications', NotificationController::class);
-    Route::patch('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-    Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
-    Route::delete('notifications/clear-read', [NotificationController::class, 'clearRead']);
+// Notification management
+Route::apiResource('notifications', NotificationController::class);
+Route::patch('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+Route::delete('notifications/clear-read', [NotificationController::class, 'clearRead']);
 
-    // Dashboard/Statistics routes
-    Route::prefix('dashboard')->group(function () {
-        Route::get('/stats', function () {
-            return response()->json([
-                'success' => true,
-                'stats' => [
-                    'repositories' => auth()->user()->repositories()->count(),
-                    'submissions' => auth()->user()->codeSubmissions()->count(),
-                    'reviews' => auth()->user()->codeSubmissions()->withCount('reviews')->get()->sum('reviews_count'),
-                    'notifications' => auth()->user()->notifications()->where('read', false)->count(),
-                ]
-            ]);
-        });
+// Dashboard/Statistics routes
+Route::prefix('dashboard')->group(function () {
+    Route::get('/stats', function () {
+        return response()->json([
+            'success' => true,
+            'stats' => [
+                'repositories' => auth()->user()->repositories()->count(),
+                'submissions' => auth()->user()->codeSubmissions()->count(),
+                'reviews' => auth()->user()->codeSubmissions()->withCount('reviews')->get()->sum('reviews_count'),
+                'notifications' => auth()->user()->notifications()->where('read', false)->count(),
+            ]
+        ]);
     });
 });
