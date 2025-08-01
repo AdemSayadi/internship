@@ -178,7 +178,7 @@ const router = createRouter({
         {
             path: '/auth/github/callback',
             name: 'GitHubCallback',
-            component: () => import('@/views/CustomPages/GitHubCallback.vue')
+            component: () => import('@/components/CustomComponents/GitHubCallback.vue')
         }
 
     ]
