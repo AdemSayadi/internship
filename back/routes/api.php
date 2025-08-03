@@ -48,7 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Repository management - NOW PROTECTED
     Route::apiResource('repositories', RepositoryController::class);
-    Route::get('repositories/{repository}/submissions', [RepositoryController::class, 'submissions']);
+    Route::get('repositories/{repository}/submissions/', [RepositoryController::class, 'submissions']);
 
     // Code submission management
     Route::apiResource('code-submissions', CodeSubmissionController::class);

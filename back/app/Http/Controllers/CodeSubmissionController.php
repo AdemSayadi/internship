@@ -1,4 +1,5 @@
 <?php
+// CodeSubmissionController.php
 
 namespace App\Http\Controllers;
 
@@ -11,13 +12,28 @@ use Illuminate\Support\Facades\Validator;
 
 class CodeSubmissionController extends Controller
 {
+    public function __construct()
+    {
+        // Ensure all routes require authentication
+        $this->middleware('auth:sanctum');
+    }
+
     /**
      * Display a listing of code submissions for the authenticated user
      */
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = auth()->user()->codeSubmissions()->with(['repository', 'reviews']);
+            // Check if user is authenticated
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
+            $query = $user->codeSubmissions()->with(['repository', 'reviews']);
 
             // Filter by repository if provided
             if ($request->has('repository_id')) {
@@ -55,6 +71,15 @@ class CodeSubmissionController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            // Check if user is authenticated
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
                 'language' => 'required|string|max:50',
@@ -73,7 +98,7 @@ class CodeSubmissionController extends Controller
 
             // Check if repository belongs to the authenticated user
             $repository = Repository::where('id', $request->repository_id)
-                ->where('user_id', auth()->id())
+                ->where('user_id', $user->id)
                 ->first();
 
             if (!$repository) {
@@ -89,12 +114,12 @@ class CodeSubmissionController extends Controller
                 'code_content' => $request->code_content,
                 'file_path' => $request->file_path,
                 'repository_id' => $request->repository_id,
-                'user_id' => auth()->id(),
+                'user_id' => $user->id,
             ]);
 
             Log::info('Code submission created', [
                 'submission_id' => $codeSubmission->id,
-                'user_id' => auth()->id(),
+                'user_id' => $user->id,
                 'repository_id' => $request->repository_id
             ]);
 
@@ -123,9 +148,17 @@ class CodeSubmissionController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
             $submission = CodeSubmission::with(['repository', 'user', 'reviews'])
                 ->where('id', $id)
-                ->where('user_id', auth()->id())
+                ->where('user_id', $user->id)
                 ->first();
 
             if (!$submission) {
@@ -160,8 +193,16 @@ class CodeSubmissionController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
             $submission = CodeSubmission::where('id', $id)
-                ->where('user_id', auth()->id())
+                ->where('user_id', $user->id)
                 ->first();
 
             if (!$submission) {
@@ -190,7 +231,7 @@ class CodeSubmissionController extends Controller
             // If repository_id is being updated, check ownership
             if ($request->has('repository_id')) {
                 $repository = Repository::where('id', $request->repository_id)
-                    ->where('user_id', auth()->id())
+                    ->where('user_id', $user->id)
                     ->first();
 
                 if (!$repository) {
@@ -207,7 +248,7 @@ class CodeSubmissionController extends Controller
 
             Log::info('Code submission updated', [
                 'submission_id' => $submission->id,
-                'user_id' => auth()->id()
+                'user_id' => $user->id
             ]);
 
             return response()->json([
@@ -236,8 +277,16 @@ class CodeSubmissionController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
             $submission = CodeSubmission::where('id', $id)
-                ->where('user_id', auth()->id())
+                ->where('user_id', $user->id)
                 ->first();
 
             if (!$submission) {
@@ -251,7 +300,7 @@ class CodeSubmissionController extends Controller
 
             Log::info('Code submission deleted', [
                 'submission_id' => $id,
-                'user_id' => auth()->id()
+                'user_id' => $user->id
             ]);
 
             return response()->json([
@@ -279,8 +328,16 @@ class CodeSubmissionController extends Controller
     public function reviews(string $id): JsonResponse
     {
         try {
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
             $submission = CodeSubmission::where('id', $id)
-                ->where('user_id', auth()->id())
+                ->where('user_id', $user->id)
                 ->first();
 
             if (!$submission) {
