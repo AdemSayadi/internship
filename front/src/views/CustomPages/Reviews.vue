@@ -31,14 +31,22 @@
 
                     <!-- Action Buttons -->
                     <div class="flex space-x-3">
+                        <!-- AI Review Button with custom styling -->
                         <button
                             @click="createReview"
                             :disabled="isCreatingReview || hasPendingReview"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            class="group relative inline-flex items-center justify-center min-w-[160px] gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-md shadow-lg hover:shadow-xl transition-all duration-300 ease-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                            :class="{ 'animate-bounce': buttonHovered }"
+                            @mouseenter="onButtonHover"
+                            @mouseleave="onButtonLeave"
                         >
-                            <span v-if="isCreatingReview">Creating Review...</span>
-                            <span v-else-if="hasPendingReview">Review in Progress</span>
-                            <span v-else>New AI Review</span>
+                            <i :class="`pi ${isCreatingReview ? 'pi-spin pi-spinner' : 'pi-bolt'} text-white relative z-10`"></i>
+                            <span class="relative z-10">
+                                <span v-if="isCreatingReview">Creating Review...</span>
+                                <span v-else-if="hasPendingReview">Review in Progress</span>
+                                <span v-else>New AI Review</span>
+                            </span>
+                            <div class="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-md"></div>
                         </button>
 
                         <button
@@ -281,6 +289,17 @@ const hasPendingReview = computed(() => {
     return reviews.value.some(review => review.status === 'pending');
 });
 
+// Animation state for button
+const buttonHovered = ref(false);
+
+const onButtonHover = () => {
+    buttonHovered.value = true;
+};
+
+const onButtonLeave = () => {
+    buttonHovered.value = false;
+};
+
 // Fetch submission details
 const fetchSubmission = async () => {
     try {
@@ -326,19 +345,48 @@ const fetchSubmission = async () => {
     }
 };
 
-// Fetch reviews for the submission
+// Mock reviews data - keeping for now
+const mockReviews = [
+    {
+        id: 1,
+        code_submission_id: 1,
+        status: 'completed',
+        overall_score: 85,
+        complexity_score: 80,
+        security_score: 90,
+        maintainability_score: 85,
+        bug_count: 2,
+        ai_summary: 'Good code structure, but consider reducing complexity in loops.',
+        suggestions: ['Use array methods instead of for loops', 'Add input validation', 'Consider breaking down complex functions'],
+        created_at: '2025-07-02',
+    },
+    {
+        id: 2,
+        code_submission_id: 1,
+        status: 'pending',
+        overall_score: 0,
+        complexity_score: 0,
+        security_score: 0,
+        maintainability_score: 0,
+        bug_count: 0,
+        ai_summary: null,
+        suggestions: [],
+        created_at: '2025-08-03',
+    }
+];
+
+// Fetch reviews for the submission - using mock data
 const fetchReviews = async () => {
     try {
         reviewsLoading.value = true;
 
-        const data = await apiRequest(`/reviews?code_submission_id=${route.params.submissionId}`);
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        if (data.success) {
-            // Filter reviews for this specific submission
-            reviews.value = data.reviews.data ?
-                data.reviews.data.filter(review => review.code_submission_id == route.params.submissionId) :
-                data.reviews.filter(review => review.code_submission_id == route.params.submissionId);
-        }
+        // Filter mock reviews for this specific submission
+        const submissionId = parseInt(route.params.submissionId);
+        reviews.value = mockReviews.filter(review => review.code_submission_id === submissionId);
+
     } catch (err) {
         console.error('Error fetching reviews:', err);
         toast.add({
@@ -352,38 +400,70 @@ const fetchReviews = async () => {
     }
 };
 
-// Create new review
+// Create new review - mock implementation
 const createReview = async () => {
     if (!submission.value || hasPendingReview.value) return;
 
     try {
         isCreatingReview.value = true;
 
-        const data = await apiRequest('/reviews', {
-            method: 'POST',
-            body: JSON.stringify({
-                code_submission_id: submission.value.id
-            })
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Create mock review
+        const newReview = {
+            id: Date.now(), // Simple ID generation
+            code_submission_id: submission.value.id,
+            status: 'pending',
+            overall_score: 0,
+            complexity_score: 0,
+            security_score: 0,
+            maintainability_score: 0,
+            bug_count: 0,
+            ai_summary: null,
+            suggestions: [],
+            created_at: new Date().toISOString(),
+        };
+
+        // Add to reviews array
+        reviews.value.unshift(newReview);
+
+        toast.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'AI review initiated successfully',
+            life: 3000
         });
 
-        if (data.success) {
-            toast.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: 'AI review initiated successfully',
-                life: 3000
-            });
+        // Simulate completion after 3 seconds
+        setTimeout(() => {
+            const reviewIndex = reviews.value.findIndex(r => r.id === newReview.id);
+            if (reviewIndex !== -1) {
+                reviews.value[reviewIndex] = {
+                    ...newReview,
+                    status: 'completed',
+                    overall_score: Math.floor(Math.random() * 30) + 70, // 70-100
+                    complexity_score: Math.floor(Math.random() * 30) + 70,
+                    security_score: Math.floor(Math.random() * 30) + 70,
+                    maintainability_score: Math.floor(Math.random() * 30) + 70,
+                    bug_count: Math.floor(Math.random() * 5),
+                    ai_summary: 'AI analysis completed. Code shows good structure with some areas for improvement.',
+                    suggestions: [
+                        'Consider adding more comments for better documentation',
+                        'Review variable naming conventions',
+                        'Add error handling for edge cases'
+                    ]
+                };
 
-            // Add the new review to the list
-            reviews.value.unshift(data.review);
+                toast.add({
+                    severity: 'info',
+                    summary: 'Review Complete',
+                    detail: 'AI review has been completed',
+                    life: 3000
+                });
+            }
+        }, 3000);
 
-            // Refresh reviews after a short delay to get updated status
-            setTimeout(() => {
-                refreshReviews();
-            }, 2000);
-        } else {
-            throw new Error(data.message || 'Failed to create review');
-        }
     } catch (err) {
         console.error('Error creating review:', err);
         toast.add({
@@ -507,8 +587,24 @@ onMounted(async () => {
     }
 }
 
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
 .animate-spin {
     animation: spin 1s linear infinite;
+}
+
+.animate-bounce {
+    animation: bounce 1s ease-in-out infinite;
 }
 
 /* Responsive adjustments */
