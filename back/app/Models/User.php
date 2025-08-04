@@ -13,10 +13,11 @@ class User extends Authenticatable
 use HasFactory, Notifiable, HasApiTokens;
 
 protected $fillable = [
-'name',
-'email',
-'password',
-'github_id',
+    'name',
+    'email',
+    'password',
+    'github_id',
+    'github_token'
 ];
 
 protected $hidden = [

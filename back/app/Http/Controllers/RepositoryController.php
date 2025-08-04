@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Repository;
+use App\Services\GitHubService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -10,9 +11,11 @@ use Illuminate\Support\Facades\Auth;
 
 class RepositoryController extends Controller
 {
-    public function __construct()
+    protected GitHubService $githubService;
+    public function __construct(GitHubService $githubService)
     {
         $this->middleware('auth:sanctum');
+        $this->githubService = $githubService;
     }
 
     public function index(Request $request): JsonResponse
@@ -220,6 +223,35 @@ class RepositoryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch submissions'
+            ], 500);
+        }
+    }
+    public function fetchGithubRepos(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user->github_token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No GitHub token found. Please connect your GitHub account.',
+                ], 400);
+            }
+
+            $repos = $this->githubService->getUserRepos($user->github_token);
+
+            return response()->json([
+                'success' => true,
+                'repositories' => $repos
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('GitHub repo fetch error', ['message' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch GitHub repositories',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
             ], 500);
         }
     }

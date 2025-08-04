@@ -195,7 +195,10 @@ class AuthController extends Controller
                 $user->save();
             }
 
-            $token = $user->createToken('github_token')->plainTextToken;
+            $user->github_token = $githubUser->token;
+            $user->save();
+
+            $token = $user->createToken('auth_token')->plainTextToken;
 
             // For popup-based auth, redirect to callback page with success data
             $callbackUrl = config('app.frontend_url', 'http://localhost:5173') . '/auth/github/callback';
