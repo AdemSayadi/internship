@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('repositories/{repository}/submissions/', [RepositoryController::class, 'submissions']);
     // Fetch repositories from GitHub
     Route::get('/github/fetch-repos', [RepositoryController::class, 'fetchGithubRepos']);
+    Route::post('/repositories/batch', [RepositoryController::class, 'batchStore']);
 
     // Code submission management
     Route::apiResource('code-submissions', CodeSubmissionController::class);

@@ -1,28 +1,23 @@
 <template>
     <MainLayout>
         <PageHeader title="Your Repositories" subtitle="Manage your repositories and submit code for AI-powered reviews." />
-        <div class="mt-10 flex justify-center">
-            <StyledButton label="Add Repository" icon="plus" @click="showDialog = true" />
+
+        <!-- Add Repository Buttons -->
+        <div class="mt-10 flex justify-center gap-4">
+            <StyledButton label="Add Local Repository" icon="plus" @click="showLocalDialog = true" />
+            <StyledButton label="Add GitHub Repository" icon="github" @click="fetchAvailableGithubRepos" />
         </div>
-        <Dialog v-model:visible="showDialog" header="Add Repository" modal class="w-full max-w-md">
+
+        <!-- Local Repository Dialog -->
+        <Dialog v-model:visible="showLocalDialog" header="Add Local Repository" modal class="w-full max-w-md">
             <form @submit.prevent="addRepository" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <label class="block text-sm font-medium text-gray-700">Name*</label>
                     <InputText v-model="form.name" class="w-full" placeholder="Repository Name" required />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">URL</label>
                     <InputText v-model="form.url" class="w-full" placeholder="https://github.com/..." />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Provider</label>
-                    <Dropdown
-                        v-model="form.provider"
-                        :options="['github', 'gitlab', 'manual']"
-                        placeholder="Select Provider"
-                        class="w-full"
-                        required
-                    />
                 </div>
                 <Button
                     type="submit"
@@ -32,6 +27,80 @@
                     class="w-full bg-indigo-600 text-white"
                 />
             </form>
+        </Dialog>
+
+        <!-- GitHub Repositories Dialog -->
+        <Dialog v-model:visible="showGithubDialog" header="Select GitHub Repositories" modal class="w-full max-w-2xl">
+            <div v-if="loadingGithubRepos" class="text-center py-8">
+                <i class="pi pi-spinner pi-spin text-2xl"></i>
+                <p class="mt-2">Loading your GitHub repositories...</p>
+            </div>
+
+            <div v-else-if="githubError" class="text-center py-8 text-red-500">
+                <i class="pi pi-exclamation-triangle text-2xl"></i>
+                <p class="mt-2">{{ githubError }}</p>
+                <Button
+                    label="Connect GitHub Account"
+                    icon="pi pi-github"
+                    class="mt-4"
+                    @click="$router.push('/integrations')"
+                />
+            </div>
+
+            <div v-else class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <div class="text-sm text-gray-500">
+                        {{ availableGithubRepos.length }} repositories found
+                    </div>
+                    <div class="text-sm font-medium">
+                        Selected: {{ selectedGithubRepos.length }}
+                    </div>
+                </div>
+
+                <DataTable
+                    :value="availableGithubRepos"
+                    selectionMode="multiple"
+                    v-model:selection="selectedGithubRepos"
+                    dataKey="id"
+                    class="w-full"
+                    :paginator="true"
+                    :rows="10"
+                    :rowsPerPageOptions="[5, 10, 20]"
+                >
+                    <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+                    <Column field="name" header="Name" sortable />
+                    <Column field="full_name" header="Full Name" sortable />
+                    <Column field="private" header="Visibility" sortable>
+                        <template #body="slotProps">
+                            <Tag :value="slotProps.data.private ? 'Private' : 'Public'"
+                                 :severity="slotProps.data.private ? 'info' : 'success'" />
+                        </template>
+                    </Column>
+                    <Column field="html_url" header="URL">
+                        <template #body="slotProps">
+                            <a :href="slotProps.data.html_url" target="_blank" class="text-indigo-600 hover:underline">
+                                {{ slotProps.data.html_url }}
+                            </a>
+                        </template>
+                    </Column>
+                </DataTable>
+
+                <div class="flex justify-end gap-2 mt-4">
+                    <Button
+                        label="Cancel"
+                        icon="pi pi-times"
+                        class="p-button-secondary"
+                        @click="showGithubDialog = false"
+                    />
+                    <Button
+                        label="Add Selected"
+                        icon="pi pi-plus"
+                        :loading="addingGithubRepos"
+                        :disabled="selectedGithubRepos.length === 0"
+                        @click="addGithubRepositories"
+                    />
+                </div>
+            </div>
         </Dialog>
 
         <!-- Loading state -->
@@ -57,7 +126,12 @@
             :rowsPerPageOptions="[5, 10, 20]"
         >
             <Column field="name" header="Name" sortable />
-            <Column field="provider" header="Provider" sortable />
+            <Column field="provider" header="Provider" sortable>
+                <template #body="slotProps">
+                    <Tag :value="slotProps.data.provider"
+                         :severity="getProviderSeverity(slotProps.data.provider)" />
+                </template>
+            </Column>
             <Column field="url" header="URL">
                 <template #body="slotProps">
                     <a
@@ -86,6 +160,7 @@
                             @click="$router.push(`/submissions/${slotProps.data.id}`)"
                         />
                         <Button
+                            v-if="slotProps.data.provider === 'manual'"
                             label="Edit"
                             icon="pi pi-pencil"
                             class="p-button-text p-button-sm"
@@ -106,22 +181,12 @@
         <Dialog v-model:visible="showEditDialog" header="Edit Repository" modal class="w-full max-w-md">
             <form @submit.prevent="updateRepository" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Name</label>
+                    <label class="block text-sm font-medium text-gray-700">Name*</label>
                     <InputText v-model="editForm.name" class="w-full" placeholder="Repository Name" required />
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">URL</label>
                     <InputText v-model="editForm.url" class="w-full" placeholder="https://github.com/..." />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Provider</label>
-                    <Dropdown
-                        v-model="editForm.provider"
-                        :options="['github', 'gitlab', 'manual']"
-                        placeholder="Select Provider"
-                        class="w-full"
-                        required
-                    />
                 </div>
                 <div class="flex gap-2">
                     <Button
@@ -174,33 +239,40 @@ import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import Tag from 'primevue/tag';
 import MainLayout from '@/components/CustomComponents/MainLayout.vue';
 import PageHeader from '@/components/CustomComponents/PageHeader.vue';
 import StyledButton from '@/components/CustomComponents/StyledButton.vue';
 import { useAuth } from '@/utils/composables/useAuth';
 
-// Reactive references
-const showDialog = ref(false);
+// State
+const showLocalDialog = ref(false);
+const showGithubDialog = ref(false);
 const showEditDialog = ref(false);
 const showDeleteDialog = ref(false);
 const loading = ref(false);
 const loadingRepositories = ref(true);
+const loadingGithubRepos = ref(false);
+const addingGithubRepos = ref(false);
 const updating = ref(false);
 const deleting = ref(false);
+const githubError = ref(null);
 
-const form = ref({ name: '', url: '', provider: '' });
-const editForm = ref({ name: '', url: '', provider: '' });
+const form = ref({ name: '', url: '', provider: 'manual' });
+const editForm = ref({ name: '', url: '', provider: 'manual' });
 const repositories = ref([]);
+const availableGithubRepos = ref([]);
+const selectedGithubRepos = ref([]);
 const repositoryToEdit = ref(null);
 const repositoryToDelete = ref(null);
 
 const router = useRouter();
 const toast = useToast();
 
-// API base URL - you might want to move this to a config file
-const API_BASE = 'http://localhost:8000/api';
+// API base URL
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-// Utility function to get auth headers
+// Utility functions
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -215,7 +287,6 @@ const getAuthHeaders = () => {
     };
 };
 
-// Format date for display
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -224,23 +295,24 @@ const formatDate = (dateString) => {
     });
 };
 
-// Fetch repositories from API
+const getProviderSeverity = (provider) => {
+    switch (provider) {
+        case 'github': return 'info';
+        case 'gitlab': return 'warning';
+        default: return 'success';
+    }
+};
+
+// Repository operations
 const fetchRepositories = async () => {
     try {
         loadingRepositories.value = true;
         const headers = getAuthHeaders();
-        if (!headers) return; // Token not found, already redirected
+        if (!headers) return;
 
-        console.log('Fetching repositories with headers:', headers);
-
-        const response = await fetch(`${API_BASE}/repositories`, {
-            headers
-        });
-
-        console.log('Response status:', response.status);
+        const response = await fetch(`${API_BASE}/repositories`, { headers });
 
         if (response.status === 401) {
-            console.error('Unauthorized - redirecting to login');
             localStorage.removeItem('token');
             router.push('/auth/login1');
             return;
@@ -248,17 +320,14 @@ const fetchRepositories = async () => {
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('API Error:', errorData);
             throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Repositories data:', data);
         repositories.value = data.repositories || [];
     } catch (error) {
         console.error('Error fetching repositories:', error);
 
-        // If it's an auth error, redirect to login
         if (error.message.includes('401') || error.message.includes('Unauthorized')) {
             localStorage.removeItem('token');
             router.push('/auth/login1');
@@ -276,13 +345,12 @@ const fetchRepositories = async () => {
     }
 };
 
-// Add new repository
 const addRepository = async () => {
-    if (!form.value.name || !form.value.provider) {
+    if (!form.value.name) {
         toast.add({
             severity: 'warn',
             summary: 'Validation Error',
-            detail: 'Name and Provider are required',
+            detail: 'Name is required',
             life: 3000,
         });
         return;
@@ -303,10 +371,8 @@ const addRepository = async () => {
 
         const data = await response.json();
         repositories.value.push(data.repository);
-
-        // Reset form and close dialog
-        form.value = { name: '', url: '', provider: '' };
-        showDialog.value = false;
+        form.value = { name: '', url: '', provider: 'manual' };
+        showLocalDialog.value = false;
 
         toast.add({
             severity: 'success',
@@ -327,7 +393,6 @@ const addRepository = async () => {
     }
 };
 
-// Edit repository
 const editRepository = (repository) => {
     repositoryToEdit.value = repository;
     editForm.value = {
@@ -338,13 +403,12 @@ const editRepository = (repository) => {
     showEditDialog.value = true;
 };
 
-// Update repository
 const updateRepository = async () => {
-    if (!editForm.value.name || !editForm.value.provider) {
+    if (!editForm.value.name) {
         toast.add({
             severity: 'warn',
             summary: 'Validation Error',
-            detail: 'Name and Provider are required',
+            detail: 'Name is required',
             life: 3000,
         });
         return;
@@ -364,8 +428,6 @@ const updateRepository = async () => {
         }
 
         const data = await response.json();
-
-        // Update the repository in the list
         const index = repositories.value.findIndex(repo => repo.id === repositoryToEdit.value.id);
         if (index !== -1) {
             repositories.value[index] = data.repository;
@@ -392,20 +454,17 @@ const updateRepository = async () => {
     }
 };
 
-// Cancel edit
 const cancelEdit = () => {
     showEditDialog.value = false;
     repositoryToEdit.value = null;
-    editForm.value = { name: '', url: '', provider: '' };
+    editForm.value = { name: '', url: '', provider: 'manual' };
 };
 
-// Confirm delete
 const confirmDelete = (repository) => {
     repositoryToDelete.value = repository;
     showDeleteDialog.value = true;
 };
 
-// Delete repository
 const deleteRepository = async () => {
     try {
         deleting.value = true;
@@ -419,9 +478,7 @@ const deleteRepository = async () => {
             throw new Error(errorData.message || 'Failed to delete repository');
         }
 
-        // Remove from local list
         repositories.value = repositories.value.filter(repo => repo.id !== repositoryToDelete.value.id);
-
         showDeleteDialog.value = false;
         repositoryToDelete.value = null;
 
@@ -444,7 +501,99 @@ const deleteRepository = async () => {
     }
 };
 
-// Authentication check and initialization
+// GitHub operations
+const fetchAvailableGithubRepos = async () => {
+    try {
+        loadingGithubRepos.value = true;
+        githubError.value = null;
+        showGithubDialog.value = true;
+        selectedGithubRepos.value = [];
+
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        const response = await fetch(`${API_BASE}/github/fetch-repos`, { headers });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            if (errorData.message.includes('No GitHub token')) {
+                githubError.value = 'Please connect your GitHub account first';
+                return;
+            }
+            throw new Error(errorData.message || 'Failed to fetch GitHub repositories');
+        }
+
+        const data = await response.json();
+        availableGithubRepos.value = data.repositories || [];
+    } catch (error) {
+        console.error('Error fetching GitHub repositories:', error);
+        githubError.value = error.message || 'Failed to fetch GitHub repositories';
+    } finally {
+        loadingGithubRepos.value = false;
+    }
+};
+
+const addGithubRepositories = async () => {
+    if (selectedGithubRepos.value.length === 0) return;
+
+    try {
+        addingGithubRepos.value = true;
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        const reposToAdd = selectedGithubRepos.value.map(repo => ({
+            name: repo.name,
+            url: repo.html_url,
+            provider: 'github',
+            github_repo_id: repo.id,
+            full_name: repo.full_name,
+            private: repo.private // Add this if your database supports it
+        }));
+
+        console.log('Sending these repositories to backend:', reposToAdd); // Debug log
+
+        const response = await fetch(`${API_BASE}/repositories/batch`, {
+            method: 'POST',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ repositories: reposToAdd })
+        });
+
+        console.log('Response status:', response.status); // Debug log
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Detailed error from backend:', errorData); // Debug log
+            throw new Error(errorData.message || 'Failed to add GitHub repositories. Status: ' + response.status);
+        }
+
+        const data = await response.json();
+        repositories.value.push(...data.repositories);
+        showGithubDialog.value = false;
+        selectedGithubRepos.value = [];
+
+        toast.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: `Added ${data.repositories.length} GitHub repositories`,
+            life: 5000,
+        });
+    } catch (error) {
+        console.error('Full error adding GitHub repositories:', error); // Debug log
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: error.message || 'Failed to add GitHub repositories. Check console for details.',
+            life: 5000,
+        });
+    } finally {
+        addingGithubRepos.value = false;
+    }
+};
+
+// Initialize
 const { checkAuth } = useAuth();
 
 onMounted(async () => {
@@ -452,8 +601,6 @@ onMounted(async () => {
         router.push('/auth/login1');
         return;
     }
-
-    // Fetch repositories on component mount
     await fetchRepositories();
 });
 </script>

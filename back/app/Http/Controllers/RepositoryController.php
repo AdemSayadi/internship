@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 class RepositoryController extends Controller
 {
     protected GitHubService $githubService;
+
     public function __construct(GitHubService $githubService)
     {
         $this->middleware('auth:sanctum');
@@ -21,7 +22,6 @@ class RepositoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            // Debug authentication
             $user = $request->user();
             if (!$user) {
                 Log::error('Repository index: No authenticated user found');
@@ -30,8 +30,6 @@ class RepositoryController extends Controller
                     'message' => 'Unauthenticated'
                 ], 401);
             }
-
-            Log::info('Repository index: User authenticated', ['user_id' => $user->id]);
 
             $repositories = $user->repositories()->with('codeSubmissions')->get();
 
@@ -70,13 +68,33 @@ class RepositoryController extends Controller
                 'name' => 'required|string|max:255',
                 'url' => 'nullable|url',
                 'provider' => 'required|in:github,gitlab,manual',
+                'github_repo_id' => 'required_if:provider,github|numeric',
+                'full_name' => 'nullable|string|max:512',
+                'is_private' => 'sometimes|boolean'
             ]);
+
+            // Check if GitHub repo already exists
+            if ($validated['provider'] === 'github' && isset($validated['github_repo_id'])) {
+                $exists = Repository::where('user_id', $user->id)
+                    ->where('github_repo_id', $validated['github_repo_id'])
+                    ->exists();
+
+                if ($exists) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'This GitHub repository is already connected'
+                    ], 409);
+                }
+            }
 
             $repository = Repository::create([
                 'name' => $validated['name'],
                 'url' => $validated['url'],
                 'provider' => $validated['provider'],
                 'user_id' => $user->id,
+                'github_repo_id' => $validated['github_repo_id'] ?? null,
+                'full_name' => $validated['full_name'] ?? null,
+                'is_private' => $validated['is_private'] ?? false,
             ]);
 
             return response()->json([
@@ -100,6 +118,96 @@ class RepositoryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create repository',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
+            ], 500);
+        }
+    }
+
+    public function batchStore(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated'
+                ], 401);
+            }
+
+            // Add detailed validation
+            $request->validate([
+                'repositories' => 'required|array|min:1',
+                'repositories.*.name' => 'required|string|max:255',
+                'repositories.*.url' => 'nullable|url',
+                'repositories.*.provider' => 'required|in:github,gitlab,manual',
+                'repositories.*.github_repo_id' => 'required_if:repositories.*.provider,github|numeric',
+                'repositories.*.full_name' => 'nullable|string|max:512',
+                'repositories.*.private' => 'sometimes|boolean'
+            ]);
+
+            $created = [];
+            $skipped = [];
+
+            foreach ($request->repositories as $repoData) {
+                try {
+                    // Check for existing GitHub repo
+                    if ($repoData['provider'] === 'github') {
+                        $exists = Repository::where('user_id', $user->id)
+                            ->where('github_repo_id', $repoData['github_repo_id'])
+                            ->exists();
+
+                        if ($exists) {
+                            $skipped[] = $repoData['full_name'] ?? $repoData['name'];
+                            continue;
+                        }
+                    }
+
+                    $repo = Repository::create([
+                        'user_id' => $user->id,
+                        'name' => $repoData['name'],
+                        'url' => $repoData['url'] ?? null,
+                        'provider' => $repoData['provider'],
+                        'github_repo_id' => $repoData['github_repo_id'] ?? null,
+                        'full_name' => $repoData['full_name'] ?? null,
+                        'is_private' => $repoData['private'] ?? false,
+                    ]);
+
+                    $created[] = $repo;
+                } catch (\Exception $e) {
+                    Log::error('Error creating repository', [
+                        'data' => $repoData,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully processed repositories',
+                'added' => count($created),
+                'skipped' => count($skipped),
+                'repositories' => $created,
+                'skipped_repositories' => $skipped
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('Repository batch store error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create repositories: ' . $e->getMessage(),
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
             ], 500);
         }
@@ -139,6 +247,14 @@ class RepositoryController extends Controller
                     'success' => false,
                     'message' => 'Unauthorized'
                 ], 403);
+            }
+
+            // Prevent editing GitHub repos (should be managed via GitHub)
+            if ($repository->provider === 'github') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'GitHub repositories cannot be edited here'
+                ], 400);
             }
 
             $validated = $request->validate([
@@ -226,6 +342,7 @@ class RepositoryController extends Controller
             ], 500);
         }
     }
+
     public function fetchGithubRepos(Request $request): JsonResponse
     {
         try {
