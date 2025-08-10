@@ -61,15 +61,13 @@ onMounted(() => {
 
 // Public navigation items (always visible)
 const publicNavigation = [
-    { name: 'Home', href: '/' },
-    { name: 'About', href: '/about' }, // Add any other public pages
+    { name: 'Home', href: '/index' },
 ];
 
 // Private navigation items (only for authenticated users)
 const privateNavigation = [
     { name: 'Repositories', href: '/repositories' },
-    { name: 'Submissions', href: '#' },
-    { name: 'Code Reviews', href: '#' },
+    { name: 'Pull Requests', href: '/pull-requests' },
     { name: 'Notifications', href: '/notifications' },
     { name: 'Dashboard', href: '/dashboard' },
 ];
