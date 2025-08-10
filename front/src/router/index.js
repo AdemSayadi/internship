@@ -138,7 +138,8 @@ const router = createRouter({
         {
             path: '/index',
             name: 'index',
-            component: () => import('@/views/CustomPages/Index.vue')
+            component: () => import('@/views/CustomPages/Index.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/auth/login1',
