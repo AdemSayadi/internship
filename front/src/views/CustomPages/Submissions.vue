@@ -81,6 +81,7 @@
 <script setup>
 import { onMounted } from 'vue';
 import { useSubmissions } from '@/utils/composables/useSubmissions';
+import {useAuth} from "@/utils/composables/useAuth";
 
 const {
     // State
@@ -99,7 +100,12 @@ const {
     fetchRepository
 } = useSubmissions();
 
+const { checkAuth } = useAuth();
 onMounted(async () => {
+    if (!checkAuth()) {
+        router.push('/auth/login1');
+        return;
+    }
     await fetchRepository();
     await fetchSubmissions();
 });

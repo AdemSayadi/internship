@@ -179,6 +179,11 @@ const router = createRouter({
             path: '/auth/github/callback',
             name: 'GitHubCallback',
             component: () => import('@/components/CustomComponents/GitHubCallback.vue')
+        },
+        {
+            path: '/pull-requests',
+            name: 'pull-requests',
+            component: () => import('@/views/CustomPages/PullRequests.vue')
         }
 
     ]

@@ -134,7 +134,7 @@ class RepositoryController extends Controller
                 ], 401);
             }
 
-            // Add detailed validation
+            // Validation
             $request->validate([
                 'repositories' => 'required|array|min:1',
                 'repositories.*.name' => 'required|string|max:255',
@@ -150,7 +150,7 @@ class RepositoryController extends Controller
 
             foreach ($request->repositories as $repoData) {
                 try {
-                    // Check for existing GitHub repo
+                    // Skip if GitHub repo already exists for this user
                     if ($repoData['provider'] === 'github') {
                         $exists = Repository::where('user_id', $user->id)
                             ->where('github_repo_id', $repoData['github_repo_id'])
@@ -162,6 +162,7 @@ class RepositoryController extends Controller
                         }
                     }
 
+                    // Create repo record
                     $repo = Repository::create([
                         'user_id' => $user->id,
                         'name' => $repoData['name'],
@@ -172,7 +173,26 @@ class RepositoryController extends Controller
                         'is_private' => $repoData['private'] ?? false,
                     ]);
 
+                    // If it's GitHub, try creating webhook
+                    if ($repo->provider === 'github' && $user->github_token && $repo->full_name) {
+                        $webhook = app(\App\Services\GitHubService::class)->createWebhook(
+                            $user->github_token,
+                            $repo->full_name,
+                            $repo->getWebhookUrl(),
+                            config('services.github.webhook_secret')
+                        );
+
+                        if ($webhook) {
+                            $repo->update([
+                                'webhook_id' => $webhook['id'] ?? null,
+                                'webhook_enabled' => true,
+                                'webhook_created_at' => now(),
+                            ]);
+                        }
+                    }
+
                     $created[] = $repo;
+
                 } catch (\Exception $e) {
                     Log::error('Error creating repository', [
                         'data' => $repoData,
@@ -212,6 +232,7 @@ class RepositoryController extends Controller
             ], 500);
         }
     }
+
 
     public function show(Request $request, Repository $repository): JsonResponse
     {

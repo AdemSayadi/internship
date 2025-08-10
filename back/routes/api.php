@@ -7,6 +7,8 @@ use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\CodeSubmissionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PullRequestController;
+use App\Http\Controllers\GitHubWebhookController;
 use Illuminate\Http\Middleware\HandleCors;
 
 /*
@@ -26,8 +28,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     // GitHub OAuth routes
     Route::get('/github', [AuthController::class, 'redirectToGithub']);
-    // NOTE: GitHub callback is handled in web.php, not here
 });
+// Public webhook endpoint (no authentication required)
+Route::post('/webhooks/github', [GitHubWebhookController::class, 'handle']);
 
 // Public password setting for GitHub users (doesn't require authentication)
 Route::post('/auth/set-password', [AuthController::class, 'setPassword']);
@@ -57,6 +60,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('code-submissions', CodeSubmissionController::class);
     Route::get('code-submissions/{id}/reviews', [CodeSubmissionController::class, 'reviews']);
 
+
+    // Pull Request management
+    Route::prefix('pull-requests')->group(function () {
+        Route::get('/', [PullRequestController::class, 'index']);
+        Route::get('/statistics', [PullRequestController::class, 'statistics']);
+        Route::get('/{id}', [PullRequestController::class, 'show']);
+        Route::get('/{id}/reviews', [PullRequestController::class, 'reviews']);
+        Route::post('/{id}/reviews', [PullRequestController::class, 'createReview']);
+        Route::post('/{id}/trigger-review', [PullRequestController::class, 'triggerReview']);
+        Route::get('/repository/{repositoryId}', [PullRequestController::class, 'getByRepository']);
+    });
+
     // Review management
     Route::apiResource('reviews', ReviewController::class);
     Route::get('reviews/statistics', [ReviewController::class, 'statistics']);
@@ -70,13 +85,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard/Statistics routes
     Route::prefix('dashboard')->group(function () {
         Route::get('/stats', function () {
+            $user = auth()->user();
             return response()->json([
                 'success' => true,
                 'stats' => [
-                    'repositories' => auth()->user()->repositories()->count(),
-                    'submissions' => auth()->user()->codeSubmissions()->count(),
-                    'reviews' => auth()->user()->codeSubmissions()->withCount('reviews')->get()->sum('reviews_count'),
-                    'notifications' => auth()->user()->notifications()->where('read', false)->count(),
+                    'repositories' => $user->repositories()->count(),
+                    'submissions' => $user->codeSubmissions()->count(),
+                    'pull_requests' => \App\Models\PullRequest::whereHas('repository', function ($q) use ($user) {
+                        $q->where('user_id', $user->id);
+                    })->count(),
+                    'reviews' => $user->codeSubmissions()->withCount('reviews')->get()->sum('reviews_count'),
+                    'notifications' => $user->notifications()->where('read', false)->count(),
                 ]
             ]);
         });
