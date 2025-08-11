@@ -1,9 +1,11 @@
 <template>
     <MainLayout>
         <PageHeader title="Code Submissions" :subtitle="`Submit and review your code for ${repository?.name || 'Repository'}.`" />
-        <div class="mt-10 flex justify-center">
-            <StyledButton label="Add Submission" icon="plus" @click="showDialog = true" />
-        </div>
+
+<!--        &lt;!&ndash; Only show Add Submission button when there are submissions &ndash;&gt;-->
+<!--        <div v-if="submissions.length > 0" class="mt-10 flex justify-center">-->
+<!--            <StyledButton label="Add Submission" icon="plus" @click="showDialog = true" />-->
+<!--        </div>-->
 
         <Dialog v-model:visible="showDialog" header="Add Code Submission" modal class="w-full max-w-md">
             <form @submit.prevent="addSubmission" class="space-y-4">
@@ -38,7 +40,35 @@
             </form>
         </Dialog>
 
+        <!-- Loading state -->
+        <div v-if="tableLoading" class="mt-8 text-center">
+            <i class="pi pi-spinner pi-spin text-2xl"></i>
+            <p class="mt-2">Loading submissions...</p>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="submissions.length === 0" class=" text-center py-12">
+            <i class="pi pi-upload text-6xl text-gray-300"></i>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">No submissions yet</h3>
+            <p class="mt-2 mb-10 text-gray-500 max-w-sm mx-auto">
+                Get started by submitting your first code for AI-powered review and feedback.
+            </p>
+            <div class="mt-6">
+                <StyledButton
+                    label="Submit Your First Code"
+                    icon="plus"
+                    @click="showDialog = true"
+                    class="bg-indigo-600 hover:bg-indigo-700"
+                />
+            </div>
+            <div class="mt-10 text-sm text-gray-400">
+                Or connect your GitHub repository for automatic pull request reviews
+            </div>
+        </div>
+
+        <!-- Data table - only show when there are submissions -->
         <DataTable
+            v-else
             :value="submissions"
             class="mt-8"
             :paginator="true"
@@ -82,6 +112,10 @@
 import { onMounted } from 'vue';
 import { useSubmissions } from '@/utils/composables/useSubmissions';
 import {useAuth} from "@/utils/composables/useAuth";
+import StyledButton from "@/components/CustomComponents/StyledButton.vue";
+import MainLayout from "@/components/CustomComponents/MainLayout.vue";
+import PageHeader from "@/components/CustomComponents/PageHeader.vue";
+import router from "@/router";
 
 const {
     // State
@@ -103,7 +137,7 @@ const {
 const { checkAuth } = useAuth();
 onMounted(async () => {
     if (!checkAuth()) {
-        router.push('/auth/login1');
+        await router.push('/auth/login1');
         return;
     }
     await fetchRepository();
