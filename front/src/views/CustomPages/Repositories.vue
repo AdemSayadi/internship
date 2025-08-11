@@ -160,6 +160,12 @@
                             @click="$router.push(`/submissions/${slotProps.data.id}`)"
                         />
                         <Button
+                            label="View Pull Requests"
+                            icon="pi pi-git-merge"
+                            class="p-button-text p-button-sm"
+                            @click="viewPullRequests(slotProps.data)"
+                        />
+                        <Button
                             v-if="slotProps.data.provider === 'manual'"
                             label="Edit"
                             icon="pi pi-pencil"
@@ -591,6 +597,14 @@ const addGithubRepositories = async () => {
     } finally {
         addingGithubRepos.value = false;
     }
+};
+
+// Navigation function for Pull Requests
+const viewPullRequests = (repository) => {
+    router.push({
+        path: '/pull-requests',
+        query: { repository_id: repository.id }
+    });
 };
 
 // Initialize

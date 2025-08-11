@@ -588,6 +588,12 @@ onMounted(async () => {
         return;
     }
 
+    // Check if there's a repository_id in the query parameters
+    const { repository_id } = router.currentRoute.value.query;
+    if (repository_id) {
+        selectedRepositoryId.value = parseInt(repository_id);
+    }
+
     await Promise.all([
         fetchRepositories(),
         fetchStatistics(),
