@@ -12,19 +12,11 @@ class PullRequestReviewService
     public function triggerAutomaticReview(PullRequest $pullRequest): void
     {
         try {
-            // Create a pending review record
-            $review = PullRequestReview::create([
-                'review_type' => 'ai_auto',
-                'status' => 'pending',
-                'pull_request_id' => $pullRequest->id,
-            ]);
-
             // Dispatch job to process the review asynchronously
-            ProcessPullRequestReview::dispatch($pullRequest, $review);
+            ProcessPullRequestReview::dispatch($pullRequest);
 
             Log::info('Automatic review triggered', [
                 'pull_request_id' => $pullRequest->id,
-                'review_id' => $review->id
             ]);
 
         } catch (\Exception $e) {

@@ -182,6 +182,12 @@
                             severity="info"
                             class="text-xs"
                         />
+                        <Tag
+                            v-if="hasFailedAiReview(slotProps.data.reviews)"
+                            value="Failed"
+                            severity="danger"
+                            class="text-xs"
+                        />
                     </div>
                 </template>
             </Column>
@@ -202,8 +208,18 @@
                             text
                             @click="viewReviews(slotProps.data)"
                         />
+                        <!-- Show retry button if last AI review failed and PR is open -->
                         <Button
-                            v-if="slotProps.data.state === 'open'"
+                            v-if="slotProps.data.state === 'open' && hasFailedAiReview(slotProps.data.reviews)"
+                            label="Relancer l’analyse IA"
+                            icon="pi pi-refresh"
+                            size="small"
+                            text
+                            @click="triggerReview(slotProps.data)"
+                        />
+                        <!-- Otherwise show the generic trigger button for open PRs -->
+                        <Button
+                            v-else-if="slotProps.data.state === 'open'"
                             label="Trigger Review"
                             icon="pi pi-refresh"
                             size="small"
@@ -443,6 +459,14 @@ const getReviewStatusSeverity = (status) => {
 
 const hasAiReview = (reviews) => {
     return reviews?.some(review => review.review_type === 'ai_auto');
+};
+
+const hasFailedAiReview = (reviews) => {
+    if (!reviews?.length) return false;
+    const latestAi = [...reviews]
+        .filter(r => r.review_type === 'ai_auto')
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+    return latestAi?.status === 'failed';
 };
 
 const hasIssues = (review) => {
