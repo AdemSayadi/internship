@@ -61,7 +61,7 @@ onMounted(() => {
 
 // Public navigation items (always visible)
 const publicNavigation = [
-    { name: 'Home', href: '/index' },
+    { name: 'Home', href: '/' },
 ];
 
 // Private navigation items (only for authenticated users)
