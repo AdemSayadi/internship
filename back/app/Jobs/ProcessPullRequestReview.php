@@ -3,77 +3,78 @@
 namespace App\Jobs;
 
 use App\Models\PullRequest;
-use App\Models\PullRequestReview;
-use App\Services\PullRequestReviewService;
+use App\Services\AICodeReviewService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Exception;
 
 class ProcessPullRequestReview implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected PullRequest $pullRequest;
-    protected PullRequestReview $review;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(PullRequest $pullRequest, PullRequestReview $review)
+    public $timeout = 600; // 10 minutes timeout for PR reviews (multiple files)
+    public $tries = 3;
+
+    public function __construct(PullRequest $pullRequest)
     {
         $this->pullRequest = $pullRequest;
-        $this->review = $review;
     }
 
-    /**
-     * Execute the job.
-     */
-    public function handle(PullRequestReviewService $reviewService): void
+    public function handle(AICodeReviewService $reviewService): void
     {
         try {
-            Log::info('Processing PR review job', [
-                'pull_request_id' => $this->pullRequest->id,
-                'review_id' => $this->review->id
+            Log::info('Starting AI review for pull request', [
+                'pr_id' => $this->pullRequest->id,
+                'github_pr_number' => $this->pullRequest->github_pr_number
             ]);
 
-            $reviewService->processReview($this->pullRequest, $this->review);
+            $review = $reviewService->reviewPullRequest($this->pullRequest);
 
-        } catch (\Exception $e) {
-            Log::error('PR review job failed', [
-                'pull_request_id' => $this->pullRequest->id,
-                'review_id' => $this->review->id,
+            Log::info('AI review completed for pull request', [
+                'pr_id' => $this->pullRequest->id,
+                'review_id' => $review->id,
+                'score' => $review->score
+            ]);
+
+            // You can add GitHub comment here if needed
+            // $this->postGitHubComment($review);
+
+        } catch (Exception $e) {
+            Log::error('Failed to process pull request review', [
+                'pr_id' => $this->pullRequest->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            // Update review status to failed
-            $this->review->update([
-                'status' => 'failed',
-                'summary' => 'Review processing failed: ' . $e->getMessage(),
+                'attempts' => $this->attempts()
             ]);
 
             throw $e;
         }
     }
 
-    /**
-     * Handle a job failure.
-     */
-    public function failed(\Throwable $exception): void
+    public function failed(Exception $exception): void
     {
-        Log::error('PR review job permanently failed', [
-            'pull_request_id' => $this->pullRequest->id,
-            'review_id' => $this->review->id,
+        Log::error('Pull request review permanently failed', [
+            'pr_id' => $this->pullRequest->id,
             'error' => $exception->getMessage()
         ]);
 
-        // Mark review as failed
-        $this->review->update([
-            'status' => 'failed',
-            'summary' => 'Review processing permanently failed: ' . $exception->getMessage(),
-        ]);
+        // Mark any pending review as failed
+        $this->pullRequest->reviews()
+            ->where('status', 'pending')
+            ->update(['status' => 'failed']);
+    }
+
+    /**
+     * Optional: Post review as GitHub comment
+     */
+    private function postGitHubComment($review): void
+    {
+        // Implement GitHub API call to post comment
+        // This would require GitHub token and API integration
     }
 }

@@ -40,6 +40,15 @@ return [
         'client_secret' => env('GITHUB_CLIENT_SECRET'),
         'redirect' => env('GITHUB_REDIRECT_URI'),
         'webhook_secret' => env('GITHUB_WEBHOOK_SECRET'),
+        'token' => env('GITHUB_TOKEN',null),
     ],
+
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        'timeout' => env('GROQ_TIMEOUT', 30),
+        'retries' => env('GROQ_RETRIES', 3),
+        'model' => env('GROQ_MODEL', 'llama3-70b-8192'),
+    ],
+
 
 ];

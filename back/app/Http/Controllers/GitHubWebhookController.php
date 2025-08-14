@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ProcessPullRequestReview;
 use App\Models\Repository;
 use App\Models\PullRequest;
 use App\Models\PullRequestFile;
@@ -105,10 +106,15 @@ class GitHubWebhookController extends Controller
             // Fetch and store files changed in this PR
             $this->fetchAndStorePullRequestFiles($pullRequest, $repository);
 
-            // Trigger automatic review
-            $this->reviewService->triggerAutomaticReview($pullRequest);
+            // Replace this line:
+            // $this->reviewService->triggerAutomaticReview($pullRequest);
+            // With:
+            $this->triggerAIReview($pullRequest, $repository);
 
-            return response()->json(['message' => 'Pull request processed'], 200);
+            return response()->json([
+                'message' => 'Pull request processed',
+                'ai_review_queued' => $repository->auto_review_enabled ?? true
+            ], 200);
 
         } catch (\Exception $e) {
             Log::error('Error handling opened pull request', [
@@ -131,10 +137,15 @@ class GitHubWebhookController extends Controller
             $pullRequest->files()->delete();
             $this->fetchAndStorePullRequestFiles($pullRequest, $repository);
 
-            // Trigger new automatic review
-            $this->reviewService->triggerAutomaticReview($pullRequest);
+            // Replace this line:
+            // $this->reviewService->triggerAutomaticReview($pullRequest);
+            // With:
+            $this->triggerAIReview($pullRequest, $repository);
 
-            return response()->json(['message' => 'Pull request synchronized'], 200);
+            return response()->json([
+                'message' => 'Pull request synchronized',
+                'ai_review_queued' => $repository->auto_review_enabled ?? true
+            ], 200);
 
         } catch (\Exception $e) {
             Log::error('Error handling synchronized pull request', [
@@ -180,10 +191,15 @@ class GitHubWebhookController extends Controller
         try {
             $pullRequest = $this->createOrUpdatePullRequest($prData, $repository);
 
-            // Trigger new automatic review
-            $this->reviewService->triggerAutomaticReview($pullRequest);
+            // Replace this line:
+            // $this->reviewService->triggerAutomaticReview($pullRequest);
+            // With:
+            $this->triggerAIReview($pullRequest, $repository);
 
-            return response()->json(['message' => 'Pull request reopened'], 200);
+            return response()->json([
+                'message' => 'Pull request reopened',
+                'ai_review_queued' => $repository->auto_review_enabled ?? true
+            ], 200);
 
         } catch (\Exception $e) {
             Log::error('Error handling reopened pull request', [
@@ -326,6 +342,46 @@ class GitHubWebhookController extends Controller
         Log::info('Webhook headers', $request->headers->all());
         Log::info('Webhook payload', [$request->getContent()]);
         return false;
+    }
+
+    protected function triggerAIReview(PullRequest $pullRequest, Repository $repository): void
+    {
+        try {
+            if (!($repository->auto_review_enabled ?? true)) {
+                Log::info('Auto-review disabled for repository', [
+                    'repository_id' => $repository->id,
+                    'pr_id' => $pullRequest->id
+                ]);
+                return;
+            }
+
+            $codeFiles = $pullRequest->files()
+                ->whereNotNull('language')
+                ->whereNotIn('status', ['removed'])
+                ->count();
+
+            if ($codeFiles === 0) {
+                Log::info('No code files found for AI review', [
+                    'pr_id' => $pullRequest->id
+                ]);
+                return;
+            }
+
+            // Dispatch AI review job directly
+            ProcessPullRequestReview::dispatch($pullRequest);
+
+            Log::info('AI review queued for pull request', [
+                'pr_id' => $pullRequest->id,
+                'github_pr_number' => $pullRequest->github_pr_number,
+                'files_count' => $codeFiles
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to trigger AI review', [
+                'pr_id' => $pullRequest->id,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
 }

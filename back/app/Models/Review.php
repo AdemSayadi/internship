@@ -11,6 +11,11 @@ class Review extends Model
 {
     use HasFactory;
 
+    const STATUS_PENDING = 'pending';
+    const STATUS_PROCESSING = 'processing';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_FAILED = 'failed';
+
     protected $fillable = [
         'code_submission_id',
         'overall_score',
@@ -28,6 +33,16 @@ class Review extends Model
         'suggestions' => 'array',
         'processing_time' => 'float',
     ];
+
+    public static function getStatuses(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_PROCESSING,
+            self::STATUS_COMPLETED,
+            self::STATUS_FAILED,
+        ];
+    }
 
     public function codeSubmission(): BelongsTo
     {
