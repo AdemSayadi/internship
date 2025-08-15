@@ -33,17 +33,39 @@
                 />
             </div>
 
-            <Button
-                label="Refresh"
-                icon="pi pi-refresh"
-                @click="fetchPullRequests"
-                :loading="loading"
-                class="ml-auto"
-            />
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-gray-700">Review Status:</label>
+                <Dropdown
+                    v-model="selectedReviewStatus"
+                    :options="reviewStatusOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="All Reviews"
+                    class="w-36"
+                    @change="fetchPullRequests"
+                />
+            </div>
+
+            <div class="flex gap-2 ml-auto">
+                <Button
+                    v-if="hasUnreviewedPRs"
+                    label="Auto-Review All"
+                    icon="pi pi-magic-wand"
+                    @click="autoReviewAllPRs"
+                    :loading="autoReviewing"
+                    severity="secondary"
+                />
+                <Button
+                    label="Refresh"
+                    icon="pi pi-refresh"
+                    @click="fetchPullRequests"
+                    :loading="loading"
+                />
+            </div>
         </div>
 
         <!-- Statistics Cards -->
-        <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-4">
             <div class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center">
                     <div class="p-2 bg-blue-100 rounded-lg">
@@ -84,11 +106,23 @@
             <div class="bg-white rounded-lg shadow p-6">
                 <div class="flex items-center">
                     <div class="p-2 bg-orange-100 rounded-lg">
-                        <i class="pi pi-eye text-orange-600 text-xl"></i>
+                        <i class="pi pi-sparkles text-orange-600 text-xl"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm text-gray-600">Reviewed</p>
+                        <p class="text-sm text-gray-600">AI Reviewed</p>
                         <p class="text-2xl font-semibold">{{ statistics.reviewed || 0 }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-2 bg-yellow-100 rounded-lg">
+                        <i class="pi pi-clock text-yellow-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-600">Pending</p>
+                        <p class="text-2xl font-semibold">{{ statistics.pending || 0 }}</p>
                     </div>
                 </div>
             </div>
@@ -118,6 +152,8 @@
             :rows="15"
             :rowsPerPageOptions="[10, 15, 25]"
             sortMode="multiple"
+            sortField="created_at"
+            :sortOrder="-1"
         >
             <Column field="title" header="Title" sortable>
                 <template #body="slotProps">
@@ -170,24 +206,19 @@
                 </template>
             </Column>
 
-            <Column header="Reviews">
+            <Column header="AI Reviews">
                 <template #body="slotProps">
                     <div class="flex items-center gap-2">
                         <span class="text-sm text-gray-600">
-                            {{ slotProps.data.reviews?.length || 0 }} reviews
+                            {{ (slotProps.data.reviews?.length || 0) }} reviews
                         </span>
-                        <Tag
-                            v-if="hasAiReview(slotProps.data.reviews)"
-                            value="AI"
-                            severity="info"
-                            class="text-xs"
-                        />
-                        <Tag
-                            v-if="hasFailedAiReview(slotProps.data.reviews)"
-                            value="Failed"
-                            severity="danger"
-                            class="text-xs"
-                        />
+                        <div v-if="hasAiReview(slotProps.data.reviews)" class="flex items-center gap-1">
+                            <Tag value="AI" severity="info" class="text-xs" />
+                            <div v-if="getLatestAiReview(slotProps.data.reviews)" class="flex items-center gap-1">
+                                <i class="pi pi-star-fill text-yellow-500 text-xs"></i>
+                                <span class="text-xs font-medium">{{ getLatestAiReview(slotProps.data.reviews).score }}/10</span>
+                            </div>
+                        </div>
                     </div>
                 </template>
             </Column>
@@ -206,25 +237,25 @@
                             icon="pi pi-comments"
                             size="small"
                             text
-                            @click="viewReviews(slotProps.data)"
+                            @click="navigateToPRReviews(slotProps.data.id)"
                         />
-                        <!-- Show retry button if last AI review failed and PR is open -->
                         <Button
-                            v-if="slotProps.data.state === 'open' && hasFailedAiReview(slotProps.data.reviews)"
-                            label="Trigger AI Review"
-                            icon="pi pi-refresh"
+                            v-if="slotProps.data.state === 'open' && !hasAiReview(slotProps.data.reviews)"
+                            label="AI Review"
+                            icon="pi pi-sparkles"
                             size="small"
                             text
-                            @click="triggerReview(slotProps.data)"
+                            @click="triggerSinglePRReview(slotProps.data.id)"
+                            :loading="reviewingPRs.includes(slotProps.data.id)"
                         />
-                        <!-- Otherwise show the generic trigger button for open PRs -->
                         <Button
                             v-else-if="slotProps.data.state === 'open'"
-                            label="Trigger Review"
+                            label="Re-Review"
                             icon="pi pi-refresh"
                             size="small"
                             text
-                            @click="triggerReview(slotProps.data)"
+                            @click="triggerSinglePRReview(slotProps.data.id)"
+                            :loading="reviewingPRs.includes(slotProps.data.id)"
                         />
                         <Button
                             label="GitHub"
@@ -237,6 +268,29 @@
                 </template>
             </Column>
         </DataTable>
+
+        <!-- Auto Review Progress Dialog -->
+        <Dialog
+            v-model:visible="showAutoReviewDialog"
+            header="Auto-Reviewing Pull Requests"
+            modal
+            :closable="false"
+            class="w-full max-w-md"
+        >
+            <div class="text-center py-4">
+                <i class="pi pi-spinner pi-spin text-3xl text-indigo-600 mb-4"></i>
+                <p class="mb-2">Processing {{ autoReviewProgress.total }} pull requests...</p>
+                <div class="bg-gray-200 rounded-full h-2 mb-2">
+                    <div
+                        class="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                        :style="{ width: `${(autoReviewProgress.completed / autoReviewProgress.total) * 100}%` }"
+                    ></div>
+                </div>
+                <p class="text-sm text-gray-600">
+                    {{ autoReviewProgress.completed }} / {{ autoReviewProgress.total }} completed
+                </p>
+            </div>
+        </Dialog>
 
         <!-- Review Details Dialog -->
         <Dialog
@@ -374,6 +428,7 @@ import Dropdown from 'primevue/dropdown';
 import MainLayout from '@/components/CustomComponents/MainLayout.vue';
 import PageHeader from '@/components/CustomComponents/PageHeader.vue';
 import { useAuth } from '@/utils/composables/useAuth';
+import { useReviewFlow } from '@/utils/composables/useReviewFlow';
 
 // State
 const loading = ref(false);
@@ -382,12 +437,26 @@ const repositories = ref([]);
 const statistics = ref({});
 const selectedRepositoryId = ref(null);
 const selectedState = ref(null);
+const selectedReviewStatus = ref(null);
 const showReviewDialog = ref(false);
 const selectedPullRequest = ref(null);
 const selectedPullRequestReviews = ref([]);
 
+// Enhanced state for auto-review
+const autoReviewing = ref(false);
+const showAutoReviewDialog = ref(false);
+const autoReviewProgress = ref({ completed: 0, total: 0 });
+const reviewingPRs = ref([]);
+
 const router = useRouter();
 const toast = useToast();
+
+// Review flow composable
+const {
+    processing: reviewProcessing,
+    triggerPullRequestReview,
+    navigateToReview
+} = useReviewFlow();
 
 // API base URL
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
@@ -408,10 +477,21 @@ const stateOptions = [
     { label: 'Merged', value: 'merged' }
 ];
 
+const reviewStatusOptions = [
+    { label: 'All Reviews', value: null },
+    { label: 'AI Reviewed', value: 'reviewed' },
+    { label: 'Pending Review', value: 'pending' },
+    { label: 'Processing', value: 'processing' }
+];
+
 // Computed property to find the current repository
 const repository = computed(() => {
     if (!selectedRepositoryId.value || !repositories.value.length) return null;
     return repositories.value.find(repo => repo.id === selectedRepositoryId.value);
+});
+
+const hasUnreviewedPRs = computed(() => {
+    return pullRequests.value.some(pr => pr.state === 'open' && !hasAiReview(pr.reviews));
 });
 
 // Utility functions
@@ -461,18 +541,100 @@ const hasAiReview = (reviews) => {
     return reviews?.some(review => review.review_type === 'ai_auto');
 };
 
-const hasFailedAiReview = (reviews) => {
-    if (!reviews?.length) return false;
-    const latestAi = [...reviews]
-        .filter(r => r.review_type === 'ai_auto')
-        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
-    return latestAi?.status === 'failed';
+const getLatestAiReview = (reviews) => {
+    if (!reviews) return null;
+    return reviews.find(review => review.review_type === 'ai_auto' && review.score);
 };
 
 const hasIssues = (review) => {
     return (review.security_issues?.length > 0) ||
         (review.performance_issues?.length > 0) ||
         (review.code_quality_issues?.length > 0);
+};
+
+// Navigation
+const navigateToPRReviews = (pullRequestId) => {
+    navigateToReview('pullrequest', pullRequestId);
+};
+
+// Single PR review trigger
+const triggerSinglePRReview = async (pullRequestId) => {
+    try {
+        reviewingPRs.value.push(pullRequestId);
+
+        const success = await triggerPullRequestReview(pullRequestId);
+        if (success) {
+            // Refresh PRs after a delay
+            setTimeout(() => {
+                fetchPullRequests();
+            }, 2000);
+        }
+
+    } finally {
+        reviewingPRs.value = reviewingPRs.value.filter(id => id !== pullRequestId);
+    }
+};
+
+// Auto-review all unreviewed PRs
+const autoReviewAllPRs = async () => {
+    try {
+        autoReviewing.value = true;
+        showAutoReviewDialog.value = true;
+
+        const unreviewedPRs = pullRequests.value.filter(pr =>
+            pr.state === 'open' && !hasAiReview(pr.reviews)
+        );
+
+        autoReviewProgress.value = {
+            completed: 0,
+            total: unreviewedPRs.length
+        };
+
+        // Process PRs one by one
+        for (let i = 0; i < unreviewedPRs.length; i++) {
+            const pr = unreviewedPRs[i];
+
+            try {
+                await triggerPullRequestReview(pr.id, false);
+                autoReviewProgress.value.completed++;
+
+                // Small delay between requests
+                if (i < unreviewedPRs.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (error) {
+                console.error(`Error reviewing PR ${pr.id}:`, error);
+                // Continue with next PR
+            }
+        }
+
+        showAutoReviewDialog.value = false;
+
+        toast.add({
+            severity: 'success',
+            summary: 'Auto-Review Complete',
+            detail: `Started AI review for ${autoReviewProgress.value.completed} pull requests`,
+            life: 5000,
+        });
+
+        // Refresh PRs
+        setTimeout(() => {
+            fetchPullRequests();
+        }, 3000);
+
+    } catch (error) {
+        console.error('Error in auto-review:', error);
+        showAutoReviewDialog.value = false;
+
+        toast.add({
+            severity: 'error',
+            summary: 'Auto-Review Failed',
+            detail: 'Failed to start auto-review process',
+            life: 5000,
+        });
+    } finally {
+        autoReviewing.value = false;
+    }
 };
 
 // API functions
@@ -485,6 +647,7 @@ const fetchPullRequests = async () => {
         const params = new URLSearchParams();
         if (selectedRepositoryId.value) params.append('repository_id', selectedRepositoryId.value);
         if (selectedState.value) params.append('state', selectedState.value);
+        if (selectedReviewStatus.value) params.append('review_status', selectedReviewStatus.value);
 
         const url = `${API_BASE}/pull-requests${params.toString() ? '?' + params.toString() : ''}`;
         const response = await fetch(url, { headers });
@@ -633,7 +796,3 @@ onMounted(async () => {
     ]);
 });
 </script>
-
-<style scoped>
-@import '@/assets/GlobalStyles.css';
-</style>

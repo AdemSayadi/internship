@@ -19,7 +19,7 @@ class ProcessPullRequestReview implements ShouldQueue
     protected PullRequest $pullRequest;
 
     public $timeout = 600; // 10 minutes timeout for PR reviews (multiple files)
-    public $tries = 3;
+    public $tries = 1;
 
     public function __construct(PullRequest $pullRequest)
     {

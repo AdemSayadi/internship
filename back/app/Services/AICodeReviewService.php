@@ -195,10 +195,10 @@ class AICodeReviewService
         ```
 
         Provide your analysis in JSON format with these fields:
-        - overall_score (1-10)
-        - complexity_score (1-10)
-        - security_score (1-10)
-        - maintainability_score (1-10)
+        - overall_score (1-100)
+        - complexity_score (1-100)
+        - security_score (1-100)
+        - maintainability_score (1-100)
         - bug_count
         - summary
         - feedback
@@ -220,10 +220,10 @@ class AICodeReviewService
     private function validateAndNormalizeResponse(array $result): array
     {
         $defaults = [
-            'overall_score' => 5,
-            'complexity_score' => 5,
-            'security_score' => 5,
-            'maintainability_score' => 5,
+            'overall_score' => 50,
+            'complexity_score' => 50,
+            'security_score' => 50,
+            'maintainability_score' => 50,
             'bug_count' => 0,
             'summary' => 'AI analysis completed',
             'feedback' => '',
@@ -259,6 +259,27 @@ class AICodeReviewService
     private function normalizeIssues(array $issues, string $type): array
     {
         return array_map(function ($issue) use ($type) {
+            // Handle case where issue is just a string
+            if (is_string($issue)) {
+                return [
+                    'line' => null,
+                    'message' => $issue,
+                    'severity' => 'medium',
+                    'type' => $type === 'suggestion' ? 'improvement' : $type,
+                ];
+            }
+
+            // Ensure we have an array to work with
+            if (!is_array($issue)) {
+                Log::warning('Unexpected issue format', ['issue' => $issue]);
+                return [
+                    'line' => null,
+                    'message' => 'Invalid issue format',
+                    'severity' => 'medium',
+                    'type' => $type,
+                ];
+            }
+
             $defaults = [
                 'line' => null,
                 'message' => 'No details provided',
@@ -281,10 +302,7 @@ class AICodeReviewService
             return $normalized;
         }, $issues);
     }
-//////////////////////////////////////////////////////////////////////////////////
-    /**
-     * Review pull request using AI
-     */
+
     public function reviewPullRequest(PullRequest $pullRequest): PullRequestReview
     {
         try {
@@ -352,128 +370,12 @@ class AICodeReviewService
         }
     }
 
-    /**
-     * Main AI analysis method
-     */
-//    private function analyzeCode(string $code, string $language, string $context = '', string $diff = null): array
-//    {
-//        $prompt = $this->buildPrompt($code, $language, $context, $diff);
-//
-//        $response = Http::withHeaders([
-//            'Authorization' => 'Bearer ' . $this->apiKey,
-//            'Content-Type' => 'application/json',
-//        ])->timeout(60)->post($this->baseUrl . '/chat/completions', [
-//            'model' => $this->model,
-//            'messages' => [
-//                [
-//                    'role' => 'system',
-//                    'content' => 'You are an expert code reviewer. Analyze code and provide detailed feedback in JSON format.'
-//                ],
-//                [
-//                    'role' => 'user',
-//                    'content' => $prompt
-//                ]
-//            ],
-//            'temperature' => 0.1,
-//            'max_tokens' => 2000,
-//        ]);
-//
-//        if (!$response->successful()) {
-//            throw new Exception('AI API request failed: ' . $response->body());
-//        }
-//
-//        $aiContent = $response->json()['choices'][0]['message']['content'];
-//
-//        // Parse JSON response
-//        $result = json_decode($aiContent, true);
-//
-//        if (!$result) {
-//            throw new Exception('Invalid AI response format');
-//        }
-//
-//        return $this->validateAndNormalizeResponse($result);
-//    }
-//
-//    /**
-//     * Build comprehensive prompt for AI analysis
-//     */
-//    private function buildPrompt(string $code, string $language, string $context, string $diff = null): string
-//    {
-//        $basePrompt = "
-//        Analyze the following {$language} code and provide a comprehensive review.
-//
-//        Context: {$context}
-//        " . ($diff ? "\nChanges (diff):\n{$diff}" : "") . "
-//
-//        Code:
-//        ```{$language}
-//        {$code}
-//        ```
-//
-//        Please provide your analysis in the following JSON format:
-//        {
-//            \"overall_score\": (1-10),
-//            \"complexity_score\": (1-10),
-//            \"security_score\": (1-10),
-//            \"maintainability_score\": (1-10),
-//            \"bug_count\": (number),
-//            \"summary\": \"Brief summary of the code quality\",
-//            \"feedback\": \"Detailed feedback about the code\",
-//            \"suggestions\": [
-//                {
-//                    \"line\": (line number or null),
-//                    \"type\": \"improvement|bug|security|performance\",
-//                    \"message\": \"Specific suggestion\",
-//                    \"severity\": \"low|medium|high\"
-//                }
-//            ],
-//            \"security_issues\": [
-//                {
-//                    \"line\": (line number or null),
-//                    \"issue\": \"Description of security issue\",
-//                    \"severity\": \"low|medium|high\",
-//                    \"recommendation\": \"How to fix it\"
-//                }
-//            ],
-//            \"performance_issues\": [
-//                {
-//                    \"line\": (line number or null),
-//                    \"issue\": \"Performance concern\",
-//                    \"impact\": \"low|medium|high\",
-//                    \"recommendation\": \"Optimization suggestion\"
-//                }
-//            ],
-//            \"code_quality_issues\": [
-//                {
-//                    \"line\": (line number or null),
-//                    \"issue\": \"Code quality issue\",
-//                    \"category\": \"readability|maintainability|best_practices\",
-//                    \"recommendation\": \"How to improve\"
-//                }
-//            ]
-//        }
-//
-//        Focus on:
-//        1. Code security vulnerabilities
-//        2. Performance issues
-//        3. Code maintainability and readability
-//        4. Best practices for {$language}
-//        5. Potential bugs or logic errors
-//        6. Code complexity and structure
-//        ";
-//
-//        return $basePrompt;
-//    }
-//
-//    /**
-//     * Validate and normalize AI response
-//     */
     private function aggregateResults(array $analyses): array
     {
         if (empty($analyses)) {
             return [
                 'summary' => 'No code files found for analysis',
-                'overall_score' => 5,
+                'overall_score' => 50,
                 'feedback' => '',
                 'suggestions' => [],
                 'security_issues' => [],
@@ -531,9 +433,6 @@ class AICodeReviewService
         ];
     }
 
-    /**
-     * Generate summary for multiple files
-     */
     private function generateSummary(array $analyses, int $avgScore): string
     {
         $fileCount = count($analyses);
@@ -547,12 +446,9 @@ class AICodeReviewService
                 count($result['code_quality_issues']);
         }
 
-        return "Analyzed {$fileCount} files with an average score of {$avgScore}/10. Found {$totalIssues} total issues and suggestions.";
+        return "Analyzed {$fileCount} files with an average score of {$avgScore}/100. Found {$totalIssues} total issues and suggestions.";
     }
 
-    /**
-     * Get file content from GitHub
-     */
     private function getFileContent(PullRequest $pullRequest, PullRequestFile $file): ?string
     {
         try {
@@ -578,9 +474,6 @@ class AICodeReviewService
         }
     }
 
-    /**
-     * Check if file is a code file
-     */
     private function isCodeFile(string $filename): bool
     {
         $codeExtensions = [
@@ -593,9 +486,6 @@ class AICodeReviewService
         return in_array(strtolower($extension), $codeExtensions);
     }
 
-    /**
-     * Detect programming language from filename
-     */
     private function detectLanguage(string $filename): string
     {
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
