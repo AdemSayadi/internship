@@ -130,13 +130,13 @@ class AICodeReviewService
         throw $lastError ?? new Exception('Unknown error occurred during AI analysis');
     }
 
-    private function analyzeCode(string $code, string $language, string $context = ''): array
+    private function analyzeCode(string $code, string $language, string $context = '', ?string $diff = null): array
     {
         if (empty($code)) {
             throw new \InvalidArgumentException('Code content cannot be empty');
         }
 
-        $prompt = $this->buildPrompt($code, $language, $context);
+        $prompt = $this->buildPrompt($code, $language, $context, $diff);
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->apiKey,
@@ -181,13 +181,14 @@ class AICodeReviewService
         ];
     }
 
-    private function buildPrompt(string $code, string $language, string $context): string
+    private function buildPrompt(string $code, string $language, string $context, ?string $diff = null): string
     {
+        $diffSection = $diff ? "\nChanges (diff):\n{$diff}\n" : '';
         return <<<PROMPT
         Analyze the following {$language} code and provide a comprehensive review.
 
         Context: {$context}
-
+        {$diffSection}
         Code:
         ```{$language}
         {$code}
@@ -312,7 +313,7 @@ class AICodeReviewService
                         $fileContent,
                         $file->language ?? $this->detectLanguage($file->filename),
                         $file->filename,
-                        $file->patch // Include diff context
+                        $file->patch // Include diff context if available
                     );
 
                     $codeAnalysis[] = [
@@ -466,28 +467,6 @@ class AICodeReviewService
 //
 //    /**
 //     * Validate and normalize AI response
-//     */
-//    private function validateAndNormalizeResponse(array $result): array
-//    {
-//        $normalized = [
-//            'overall_score' => max(1, min(10, $result['overall_score'] ?? 5)),
-//            'complexity_score' => max(1, min(10, $result['complexity_score'] ?? 5)),
-//            'security_score' => max(1, min(10, $result['security_score'] ?? 5)),
-//            'maintainability_score' => max(1, min(10, $result['maintainability_score'] ?? 5)),
-//            'bug_count' => max(0, $result['bug_count'] ?? 0),
-//            'summary' => $result['summary'] ?? 'AI analysis completed',
-//            'feedback' => $result['feedback'] ?? '',
-//            'suggestions' => $result['suggestions'] ?? [],
-//            'security_issues' => $result['security_issues'] ?? [],
-//            'performance_issues' => $result['performance_issues'] ?? [],
-//            'code_quality_issues' => $result['code_quality_issues'] ?? [],
-//        ];
-//
-//        return $normalized;
-//    }
-//
-//    /**
-//     * Aggregate results from multiple files
 //     */
     private function aggregateResults(array $analyses): array
     {
