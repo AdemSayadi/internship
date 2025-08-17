@@ -31,7 +31,6 @@
 
                     <!-- Action Buttons -->
                     <div class="flex space-x-3">
-                        <!-- AI Review Button with custom styling -->
                         <button
                             @click="createReview"
                             :disabled="isCreatingReview || hasPendingReview"
@@ -176,7 +175,7 @@
                         <template #body="slotProps">
                             <div class="flex space-x-2">
                                 <button
-                                    @click="viewReviewDetails(slotProps.data)"
+                                    @click="showReviewDetails(slotProps.data)"
                                     class="text-blue-600 hover:text-blue-800 text-sm"
                                     title="View Details"
                                 >
@@ -206,6 +205,93 @@
                 Try Again
             </button>
         </div>
+
+        <!-- Review Details Modal -->
+        <Dialog
+            v-model:visible="showModal"
+            header="Review Details"
+            :modal="true"
+            :style="{ width: '50rem' }"
+            :breakpoints="{ '960px': '75vw', '640px': '90vw' }"
+            class="p-fluid"
+        >
+            <div v-if="selectedReview" class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Review Summary</h3>
+                    <p class="mt-2 text-gray-600">{{ selectedReview.ai_summary || 'No summary available' }}</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Scores</h3>
+                    <div class="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                            <p class="font-medium">Overall Score:</p>
+                            <div class="flex items-center">
+                                <span>{{ selectedReview.overall_score || 0 }}</span>
+                                <div class="ml-2 w-24 bg-gray-200 rounded-full h-2">
+                                    <div
+                                        class="bg-blue-500 h-2 rounded-full"
+                                        :style="{ width: `${selectedReview.overall_score || 0}%` }"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="font-medium">Complexity Score:</p>
+                            <span>{{ selectedReview.complexity_score || 0 }}</span>
+                        </div>
+                        <div>
+                            <p class="font-medium">Security Score:</p>
+                            <span>{{ selectedReview.security_score || 0 }}</span>
+                        </div>
+                        <div>
+                            <p class="font-medium">Maintainability Score:</p>
+                            <span>{{ selectedReview.maintainability_score || 0 }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Bugs</h3>
+                    <p :class="selectedReview.bug_count > 0 ? 'text-red-600' : 'text-green-600'">
+                        {{ selectedReview.bug_count || 0 }} bug(s) detected
+                    </p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Suggestions</h3>
+                    <div v-if="selectedReview.suggestions && selectedReview.suggestions.length">
+                        <ul class="space-y-2">
+                            <li
+                                v-for="(suggestion, index) in selectedReview.suggestions"
+                                :key="index"
+                                class="flex items-start"
+                            >
+                                <span class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                                <span class="text-gray-700">{{ suggestion }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <p v-else class="text-gray-500">No suggestions available</p>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">Metadata</h3>
+                    <p class="text-gray-600">Status: <span :class="getStatusClass(selectedReview.status)">{{ capitalizeFirst(selectedReview.status) }}</span></p>
+                    <p class="text-gray-600">Created: {{ formatDate(selectedReview.created_at) }}</p>
+                    <p class="text-gray-600">Review ID: {{ selectedReview.id }}</p>
+                </div>
+            </div>
+
+            <template #footer>
+                <Button
+                    label="Close"
+                    icon="pi pi-times"
+                    class="p-button-text"
+                    @click="showModal = false"
+                />
+            </template>
+        </Dialog>
     </MainLayout>
 </template>
 
@@ -215,6 +301,8 @@ import { useRouter, useRoute } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import Dialog from 'primevue/dialog';
+import Button from 'primevue/button';
 import MainLayout from '@/components/CustomComponents/MainLayout.vue';
 import PageHeader from '@/components/CustomComponents/PageHeader.vue';
 import { useAuth } from '@/utils/composables/useAuth';
@@ -226,18 +314,19 @@ const loading = ref(true);
 const reviewsLoading = ref(false);
 const isCreatingReview = ref(false);
 const error = ref(null);
+const showModal = ref(false);
+const selectedReview = ref(null);
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const { checkAuth } = useAuth();
 
-// API Base URL - adjust this to match your Laravel API
+// API Base URL
 const API_BASE_URL = 'http://localhost:8000/api';
 
-// Helper function to make authenticated API requests (reusing your pattern)
+// Helper function for authenticated API requests
 const apiRequest = async (endpoint, options = {}) => {
-    // Try different possible token storage keys
     const token = localStorage.getItem('auth_token') ||
         localStorage.getItem('token') ||
         localStorage.getItem('access_token') ||
@@ -269,7 +358,6 @@ const apiRequest = async (endpoint, options = {}) => {
 
     if (!response.ok) {
         if (response.status === 401) {
-            // Clear potentially invalid token
             localStorage.removeItem('auth_token');
             localStorage.removeItem('token');
             sessionStorage.removeItem('auth_token');
@@ -311,7 +399,6 @@ const fetchSubmission = async () => {
 
         if (data.success) {
             submission.value = data.submission;
-            // If the submission has reviews, use them; otherwise fetch separately
             if (submission.value.reviews) {
                 reviews.value = submission.value.reviews;
             } else {
@@ -345,7 +432,7 @@ const fetchSubmission = async () => {
     }
 };
 
-// Mock reviews data - keeping for now
+// Mock reviews data
 const mockReviews = [
     {
         id: 1,
@@ -375,18 +462,13 @@ const mockReviews = [
     }
 ];
 
-// Fetch reviews for the submission - using mock data
+// Fetch reviews
 const fetchReviews = async () => {
     try {
         reviewsLoading.value = true;
-
-        // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Filter mock reviews for this specific submission
         const submissionId = parseInt(route.params.submissionId);
         reviews.value = mockReviews.filter(review => review.code_submission_id === submissionId);
-
     } catch (err) {
         console.error('Error fetching reviews:', err);
         toast.add({
@@ -400,19 +482,16 @@ const fetchReviews = async () => {
     }
 };
 
-// Create new review - mock implementation
+// Create new review
 const createReview = async () => {
     if (!submission.value || hasPendingReview.value) return;
 
     try {
         isCreatingReview.value = true;
-
-        // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Create mock review
         const newReview = {
-            id: Date.now(), // Simple ID generation
+            id: Date.now(),
             code_submission_id: submission.value.id,
             status: 'pending',
             overall_score: 0,
@@ -425,7 +504,6 @@ const createReview = async () => {
             created_at: new Date().toISOString(),
         };
 
-        // Add to reviews array
         reviews.value.unshift(newReview);
 
         toast.add({
@@ -435,14 +513,13 @@ const createReview = async () => {
             life: 3000
         });
 
-        // Simulate completion after 3 seconds
         setTimeout(() => {
             const reviewIndex = reviews.value.findIndex(r => r.id === newReview.id);
             if (reviewIndex !== -1) {
                 reviews.value[reviewIndex] = {
                     ...newReview,
                     status: 'completed',
-                    overall_score: Math.floor(Math.random() * 30) + 70, // 70-100
+                    overall_score: Math.floor(Math.random() * 30) + 70,
                     complexity_score: Math.floor(Math.random() * 30) + 70,
                     security_score: Math.floor(Math.random() * 30) + 70,
                     maintainability_score: Math.floor(Math.random() * 30) + 70,
@@ -519,14 +596,10 @@ const deleteReview = async (reviewId) => {
     }
 };
 
-// View review details (placeholder for future implementation)
-const viewReviewDetails = (review) => {
-    toast.add({
-        severity: 'info',
-        summary: 'Info',
-        detail: 'Review details feature coming soon',
-        life: 3000
-    });
+// Show review details in modal
+const showReviewDetails = (review) => {
+    selectedReview.value = review;
+    showModal.value = true;
 };
 
 // Utility functions
@@ -567,7 +640,6 @@ onMounted(async () => {
 <style scoped>
 @import '@/assets/GlobalStyles.css';
 
-/* Custom styles for better visual hierarchy */
 .p-datatable .p-datatable-tbody > tr > td {
     padding: 0.75rem;
     border-bottom: 1px solid #e5e7eb;
@@ -580,7 +652,6 @@ onMounted(async () => {
     color: #374151;
 }
 
-/* Loading animation */
 @keyframes spin {
     to {
         transform: rotate(360deg);
@@ -607,7 +678,6 @@ onMounted(async () => {
     animation: bounce 1s ease-in-out infinite;
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
     .p-datatable .p-datatable-tbody > tr > td,
     .p-datatable .p-datatable-thead > tr > th {

@@ -253,7 +253,7 @@ class AICodeReviewService
 
     private function clampScore($score): int
     {
-        return max(1, min(10, (int) $score));
+        return max(1, min(100, (int) $score));
     }
 
     private function normalizeIssues(array $issues, string $type): array

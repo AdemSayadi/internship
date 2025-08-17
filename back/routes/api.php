@@ -121,52 +121,63 @@ Route::middleware('auth:sanctum')->group(function () {
 // Test routes for development and debugging
 Route::middleware('auth:sanctum')->prefix('test')->group(function () {
 
-    // Test 1: Create a sample code submission
+    // Test 4: Java Sample Submission (object-oriented example)
     Route::post('create-sample-submission', function () {
         $user = auth()->user();
 
-        // Get or create a repository
-        $repository = $user->repositories()->first();
-        if (!$repository) {
-            $repository = \App\Models\Repository::create([
-                'name' => 'test-repo',
-                'url' => 'https://github.com/testuser/test-repo',
-                'provider' => 'github',
-                'user_id' => $user->id,
-                'full_name' => 'testuser/test-repo',
-                'is_private' => false,
-                'webhook_enabled' => true,
-            ]);
-        }
+        $repository = $user->repositories()->firstOrCreate([
+            'user_id' => $user->id,
+        ], [
+            'name' => 'test-repo-java',
+            'url' => 'https://github.com/testuser/test-repo-java',
+            'provider' => 'github',
+            'full_name' => 'testuser/test-repo-java',
+            'is_private' => false,
+            'webhook_enabled' => true,
+        ]);
 
-        // Create sample code submission
         $submission = \App\Models\CodeSubmission::create([
-            'title' => 'Test PHP Function',
-            'language' => 'php',
-            'code_content' => '<?php
-function calculateTotal($items) {
-    $total = 0;
-    for ($i = 0; $i < count($items); $i++) {
-        $total += $items[$i]["price"] * $items[$i]["quantity"];
+            'title' => 'Java Student Grade Calculator',
+            'language' => 'java',
+            'code_content' => 'import java.util.*;
+
+class Student {
+    String name;
+    List<Integer> grades;
+
+    public Student(String name, List<Integer> grades) {
+        this.name = name;
+        this.grades = grades;
     }
-    return $total;
+
+    public double averageGrade() {
+        return grades.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+    }
+
+    public String getResult() {
+        double avg = averageGrade();
+        return avg >= 60 ? "Pass" : "Fail";
+    }
 }
 
-function processOrder($order) {
-    if (!$order) return false;
-    $total = calculateTotal($order["items"]);
-    return ["total" => $total, "status" => "processed"];
+public class Main {
+    public static void main(String[] args) {
+        Student s = new Student("Alice", Arrays.asList(75, 82, 91, 68));
+        System.out.println(s.name + " => " + s.getResult());
+    }
 }',
-            'file_path' => 'src/OrderProcessor.php',
+            'file_path' => 'src/Main.java',
             'repository_id' => $repository->id,
             'user_id' => $user->id,
         ]);
 
         return response()->json([
-            'message' => 'Sample submission created',
+            'message' => 'Java submission created',
             'submission' => $submission
         ]);
     });
+
+
 
     // Test 2: Trigger AI review manually
     Route::post('trigger-review/{submission}', function (\App\Models\CodeSubmission $submission) {
