@@ -296,7 +296,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
@@ -316,6 +316,8 @@ const isCreatingReview = ref(false);
 const error = ref(null);
 const showModal = ref(false);
 const selectedReview = ref(null);
+const pollingInterval = ref(null);
+const buttonHovered = ref(false);
 
 const router = useRouter();
 const route = useRoute();
@@ -354,22 +356,27 @@ const apiRequest = async (endpoint, options = {}) => {
         },
     };
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, mergedOptions);
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, mergedOptions);
 
-    if (!response.ok) {
-        if (response.status === 401) {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('auth_token');
-            sessionStorage.removeItem('token');
-            throw new Error('Authentication failed. Please log in again.');
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('token');
+                sessionStorage.removeItem('auth_token');
+                sessionStorage.removeItem('token');
+                throw new Error('Authentication failed. Please log in again.');
+            }
+
+            const errorData = await response.json().catch(() => ({ message: 'An error occurred' }));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
 
-        const errorData = await response.json().catch(() => ({ message: 'An error occurred' }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        return await response.json();
+    } catch (err) {
+        console.error('API request failed:', err);
+        throw err;
     }
-
-    return response.json();
 };
 
 // Computed properties
@@ -378,8 +385,6 @@ const hasPendingReview = computed(() => {
 });
 
 // Animation state for button
-const buttonHovered = ref(false);
-
 const onButtonHover = () => {
     buttonHovered.value = true;
 };
@@ -397,78 +402,39 @@ const fetchSubmission = async () => {
         const submissionId = route.params.submissionId;
         const data = await apiRequest(`/code-submissions/${submissionId}`);
 
-        if (data.success) {
-            submission.value = data.submission;
-            if (submission.value.reviews) {
-                reviews.value = submission.value.reviews;
-            } else {
-                await fetchReviews();
-            }
-        } else {
-            throw new Error(data.message || 'Failed to fetch submission');
-        }
+        submission.value = data.submission || data.data;
+        await fetchReviews();
     } catch (err) {
         console.error('Error fetching submission:', err);
+        error.value = err.message || 'Failed to load submission';
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: error.value,
+            life: 5000
+        });
 
         if (err.message.includes('Authentication failed')) {
-            toast.add({
-                severity: 'error',
-                summary: 'Authentication Error',
-                detail: 'Please log in again',
-                life: 3000
-            });
             router.push('/auth/login1');
-        } else {
-            error.value = err.message || 'Failed to load submission';
-            toast.add({
-                severity: 'error',
-                summary: 'Error',
-                detail: error.value,
-                life: 5000
-            });
         }
     } finally {
         loading.value = false;
     }
 };
 
-// Mock reviews data
-const mockReviews = [
-    {
-        id: 1,
-        code_submission_id: 1,
-        status: 'completed',
-        overall_score: 85,
-        complexity_score: 80,
-        security_score: 90,
-        maintainability_score: 85,
-        bug_count: 2,
-        ai_summary: 'Good code structure, but consider reducing complexity in loops.',
-        suggestions: ['Use array methods instead of for loops', 'Add input validation', 'Consider breaking down complex functions'],
-        created_at: '2025-07-02',
-    },
-    {
-        id: 2,
-        code_submission_id: 1,
-        status: 'pending',
-        overall_score: 0,
-        complexity_score: 0,
-        security_score: 0,
-        maintainability_score: 0,
-        bug_count: 0,
-        ai_summary: null,
-        suggestions: [],
-        created_at: '2025-08-03',
-    }
-];
-
 // Fetch reviews
 const fetchReviews = async () => {
     try {
         reviewsLoading.value = true;
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const submissionId = parseInt(route.params.submissionId);
-        reviews.value = mockReviews.filter(review => review.code_submission_id === submissionId);
+        const submissionId = route.params.submissionId;
+        const data = await apiRequest(`/code-submissions/${submissionId}/reviews`);
+
+        reviews.value = data.reviews || data.data || [];
+
+        // If there's a pending review, start polling
+        if (hasPendingReview.value) {
+            startPollingForReviewCompletion();
+        }
     } catch (err) {
         console.error('Error fetching reviews:', err);
         toast.add({
@@ -482,65 +448,68 @@ const fetchReviews = async () => {
     }
 };
 
+// Start polling for review completion
+const startPollingForReviewCompletion = () => {
+    // Clear any existing interval
+    if (pollingInterval.value) {
+        clearInterval(pollingInterval.value);
+    }
+
+    // Set up new interval
+    pollingInterval.value = setInterval(async () => {
+        try {
+            const submissionId = route.params.submissionId;
+            const data = await apiRequest(`/code-submissions/${submissionId}/reviews`);
+
+            if (data.success || data.data) {
+                const currentReviews = data.reviews || data.data || [];
+                const hasCompleted = !currentReviews.some(r => r.status === 'pending');
+
+                if (hasCompleted) {
+                    clearInterval(pollingInterval.value);
+                    pollingInterval.value = null;
+                    reviews.value = currentReviews;
+
+                    toast.add({
+                        severity: 'success',
+                        summary: 'Review Completed',
+                        detail: 'AI review has been completed',
+                        life: 3000
+                    });
+                } else {
+                    // Update reviews with latest data
+                    reviews.value = currentReviews;
+                }
+            }
+        } catch (err) {
+            console.error('Error during polling:', err);
+            clearInterval(pollingInterval.value);
+            pollingInterval.value = null;
+        }
+    }, 5000); // Poll every 5 seconds
+};
+
 // Create new review
 const createReview = async () => {
     if (!submission.value || hasPendingReview.value) return;
 
     try {
         isCreatingReview.value = true;
-        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const newReview = {
-            id: Date.now(),
-            code_submission_id: submission.value.id,
-            status: 'pending',
-            overall_score: 0,
-            complexity_score: 0,
-            security_score: 0,
-            maintainability_score: 0,
-            bug_count: 0,
-            ai_summary: null,
-            suggestions: [],
-            created_at: new Date().toISOString(),
-        };
-
-        reviews.value.unshift(newReview);
+        const submissionId = route.params.submissionId;
+        const data = await apiRequest(`/ai-review/code-submissions/${submissionId}/review`, {
+            method: 'POST'
+        });
 
         toast.add({
             severity: 'success',
             summary: 'Success',
-            detail: 'AI review initiated successfully',
+            detail: data.message || 'AI review initiated successfully',
             life: 3000
         });
 
-        setTimeout(() => {
-            const reviewIndex = reviews.value.findIndex(r => r.id === newReview.id);
-            if (reviewIndex !== -1) {
-                reviews.value[reviewIndex] = {
-                    ...newReview,
-                    status: 'completed',
-                    overall_score: Math.floor(Math.random() * 30) + 70,
-                    complexity_score: Math.floor(Math.random() * 30) + 70,
-                    security_score: Math.floor(Math.random() * 30) + 70,
-                    maintainability_score: Math.floor(Math.random() * 30) + 70,
-                    bug_count: Math.floor(Math.random() * 5),
-                    ai_summary: 'AI analysis completed. Code shows good structure with some areas for improvement.',
-                    suggestions: [
-                        'Consider adding more comments for better documentation',
-                        'Review variable naming conventions',
-                        'Add error handling for edge cases'
-                    ]
-                };
-
-                toast.add({
-                    severity: 'info',
-                    summary: 'Review Complete',
-                    detail: 'AI review has been completed',
-                    life: 3000
-                });
-            }
-        }, 3000);
-
+        // Refresh reviews to get the new pending review
+        await fetchReviews();
     } catch (err) {
         console.error('Error creating review:', err);
         toast.add({
@@ -556,13 +525,17 @@ const createReview = async () => {
 
 // Refresh reviews
 const refreshReviews = async () => {
-    await fetchReviews();
-    toast.add({
-        severity: 'info',
-        summary: 'Refreshed',
-        detail: 'Reviews updated',
-        life: 2000
-    });
+    try {
+        await fetchReviews();
+        toast.add({
+            severity: 'info',
+            summary: 'Refreshed',
+            detail: 'Reviews updated',
+            life: 2000
+        });
+    } catch (err) {
+        console.error('Error refreshing reviews:', err);
+    }
 };
 
 // Delete review
@@ -574,17 +547,13 @@ const deleteReview = async (reviewId) => {
             method: 'DELETE'
         });
 
-        if (data.success) {
-            reviews.value = reviews.value.filter(review => review.id !== reviewId);
-            toast.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: 'Review deleted successfully',
-                life: 3000
-            });
-        } else {
-            throw new Error(data.message || 'Failed to delete review');
-        }
+        reviews.value = reviews.value.filter(review => review.id !== reviewId);
+        toast.add({
+            severity: 'success',
+            summary: 'Success',
+            detail: data.message || 'Review deleted successfully',
+            life: 3000
+        });
     } catch (err) {
         console.error('Error deleting review:', err);
         toast.add({
@@ -604,6 +573,7 @@ const showReviewDetails = (review) => {
 
 // Utility functions
 const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -614,6 +584,7 @@ const formatDate = (dateString) => {
 };
 
 const capitalizeFirst = (str) => {
+    if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
@@ -626,14 +597,32 @@ const getStatusClass = (status) => {
     return classes[status] || 'px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full';
 };
 
+// Clean up polling interval when component is unmounted
+onUnmounted(() => {
+    if (pollingInterval.value) {
+        clearInterval(pollingInterval.value);
+    }
+});
+
 // Lifecycle
 onMounted(async () => {
-    if (!checkAuth()) {
-        router.push('/auth/login1');
-        return;
-    }
+    try {
+        if (!checkAuth()) {
+            router.push('/auth/login1');
+            return;
+        }
 
-    await fetchSubmission();
+        await fetchSubmission();
+    } catch (err) {
+        console.error('Component initialization error:', err);
+        error.value = 'Failed to initialize component';
+        toast.add({
+            severity: 'error',
+            summary: 'Initialization Error',
+            detail: 'Failed to load component data',
+            life: 5000
+        });
+    }
 });
 </script>
 

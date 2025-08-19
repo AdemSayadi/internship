@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Events\CodeSubmissionCreated;
 
 class CodeSubmission extends Model
 {
@@ -33,6 +34,13 @@ class CodeSubmission extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+    protected static function booted()
+    {
+        static::created(function ($codeSubmission) {
+            // Dispatch event instead of creating notification directly
+            CodeSubmissionCreated::dispatch($codeSubmission, $codeSubmission->user);
+        });
     }
 }
 

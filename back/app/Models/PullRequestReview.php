@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Events\PullRequestReviewCompleted;
 
 class PullRequestReview extends Model
 {
@@ -84,5 +85,14 @@ class PullRequestReview extends Model
     public function isManualReview(): bool
     {
         return $this->review_type === 'manual';
+    }
+    protected static function booted()
+    {
+        static::updated(function ($pullRequestReview) {
+            // Only dispatch when status changes to completed
+            if ($pullRequestReview->isDirty('status') && $pullRequestReview->status === 'completed') {
+                PullRequestReviewCompleted::dispatch($pullRequestReview, $pullRequestReview->pullRequest->user);
+            }
+        });
     }
 }

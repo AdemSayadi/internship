@@ -1,4 +1,5 @@
 <?php
+// Updated App\Listeners\CreateReviewCompletedNotification.php
 
 namespace App\Listeners;
 
@@ -16,7 +17,15 @@ class CreateReviewCompletedNotification
             Notification::create([
                 'user_id' => $codeSubmission->user_id,
                 'review_id' => $event->review->id,
-                'message' => "The review for your code submission: {$codeSubmission->title} has been marked as completed.",
+                'type' => Notification::TYPE_REVIEW_COMPLETED,
+                'title' => 'Review Completed',
+                'message' => "The review for your code submission '{$codeSubmission->title}' has been completed with a score of {$event->review->overall_score}/10.",
+                'data' => [
+                    'review_id' => $event->review->id,
+                    'code_submission_id' => $event->review->code_submission_id,
+                    'title' => $codeSubmission->title,
+                    'score' => $event->review->overall_score,
+                ],
                 'read' => false,
             ]);
 
@@ -27,7 +36,6 @@ class CreateReviewCompletedNotification
         } catch (\Exception $e) {
             Log::error('Failed to create notification for review completed', [
                 'review_id' => $event->review->id,
-                'user_id' => $codeSubmission->user_id,
                 'error' => $e->getMessage(),
             ]);
         }

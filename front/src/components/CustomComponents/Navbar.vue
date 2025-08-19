@@ -4,6 +4,7 @@ import { Bars3Icon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "@/utils/composables/useAuth";
+import NotificationsDropdown from "@/components/CustomComponents/NotificationDropdown.vue";
 
 const router = useRouter();
 const mobileMenuOpen = ref(false);
@@ -123,6 +124,9 @@ const navigation = computed(() => {
                 </router-link>
             </template>
             <template v-else>
+                <!-- Notifications Dropdown -->
+                <NotificationsDropdown />
+
                 <button
                     v-if="showGitHubConnect"
                     @click="connectGitHub"
@@ -133,16 +137,24 @@ const navigation = computed(() => {
                     </svg>
                     Connect GitHub
                 </button>
-                <button
-                    @click="handleLogout"
-                    class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-500 transition-colors"
-                >
-                    Log out <span aria-hidden="true">&rarr;</span>
-                </button>
+
+                <!-- User Profile Dropdown (Optional) -->
+                <div class="flex items-center gap-2">
+                    <span v-if="userProfile" class="text-sm text-gray-700 mr-5">
+                        {{ userProfile.name }}
+                    </span>
+                    <button
+                        @click="handleLogout"
+                        class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-500 transition-colors"
+                    >
+                        Log out <span aria-hidden="true">&rarr;</span>
+                    </button>
+                </div>
             </template>
         </div>
     </nav>
 
+    <!-- Mobile Menu -->
     <Dialog as="div" class="lg:hidden" @close="mobileMenuOpen = false" :open="mobileMenuOpen">
         <div class="fixed inset-0 z-50" />
         <DialogPanel class="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
@@ -187,6 +199,15 @@ const navigation = computed(() => {
                             </router-link>
                         </template>
                         <template v-else>
+                            <!-- Mobile Notifications Link -->
+                            <router-link
+                                to="/notifications"
+                                @click="mobileMenuOpen = false"
+                                class="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50"
+                            >
+                                Notifications
+                            </router-link>
+
                             <button
                                 v-if="showGitHubConnect"
                                 @click="connectGitHub"

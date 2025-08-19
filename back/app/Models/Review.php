@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Events\ReviewSubmitted;
+use App\Events\ReviewCompleted;
 
 class Review extends Model
 {
@@ -52,5 +54,20 @@ class Review extends Model
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    protected static function booted()
+    {
+        static::created(function ($review) {
+            // Dispatch ReviewSubmitted event when review is created
+            ReviewSubmitted::dispatch($review, $review->codeSubmission->user);
+        });
+
+        static::updated(function ($review) {
+            // Dispatch ReviewCompleted event when status changes to completed
+            if ($review->isDirty('status') && $review->status === self::STATUS_COMPLETED) {
+                ReviewCompleted::dispatch($review, $review->codeSubmission->user);
+            }
+        });
     }
 }

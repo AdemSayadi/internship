@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Events\PullRequestCreated;
 
 class PullRequest extends Model
 {
@@ -89,5 +90,12 @@ class PullRequest extends Model
     public function isMerged(): bool
     {
         return $this->state === 'merged';
+    }
+    protected static function booted()
+    {
+        static::created(function ($pullRequest) {
+            // Dispatch event instead of creating notification directly
+            PullRequestCreated::dispatch($pullRequest, $pullRequest->user);
+        });
     }
 }

@@ -26,7 +26,13 @@ class NotificationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'notifications' => $notifications
+                'data' => $notifications->items(),
+                'pagination' => [
+                    'current_page' => $notifications->currentPage(),
+                    'last_page' => $notifications->lastPage(),
+                    'per_page' => $notifications->perPage(),
+                    'total' => $notifications->total(),
+                ]
             ]);
 
         } catch (\Exception $e) {
@@ -43,32 +49,57 @@ class NotificationController extends Controller
     }
 
     /**
+     * Get recent notifications for dropdown (limited to 5)
+     */
+    public function recent(): JsonResponse
+    {
+        try {
+            $notifications = auth()->user()
+                ->notifications()
+                ->with('review.codeSubmission')
+                ->orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $notifications
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Get recent notifications error', [
+                'message' => $e->getMessage(),
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve recent notifications'
+            ], 500);
+        }
+    }
+
+    /**
      * Store a newly created notification
      */
     public function store(Request $request): JsonResponse
     {
         try {
             $request->validate([
-                'review_id' => 'required|exists:reviews,id',
+                'type' => 'required|string',
+                'title' => 'required|string|max:255',
                 'message' => 'required|string|max:500',
+                'review_id' => 'nullable|exists:reviews,id',
+                'data' => 'nullable|array',
             ]);
-
-            // Verify the review belongs to the authenticated user
-            $reviewExists = \App\Models\Review::whereHas('codeSubmission', function ($q) {
-                $q->where('user_id', auth()->id());
-            })->where('id', $request->review_id)->exists();
-
-            if (!$reviewExists) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Review not found or unauthorized'
-                ], 404);
-            }
 
             $notification = Notification::create([
                 'user_id' => auth()->id(),
-                'review_id' => $request->review_id,
+                'type' => $request->type,
+                'title' => $request->title,
                 'message' => $request->message,
+                'review_id' => $request->review_id,
+                'data' => $request->data,
                 'read' => false,
             ]);
 
@@ -80,7 +111,7 @@ class NotificationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Notification created successfully',
-                'notification' => $notification->load('review')
+                'data' => $notification->load('review')
             ], 201);
 
         } catch (\Exception $e) {
@@ -116,7 +147,7 @@ class NotificationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'notification' => $notification
+                'data' => $notification
             ]);
 
         } catch (\Exception $e) {
@@ -165,7 +196,7 @@ class NotificationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Notification updated successfully',
-                'notification' => $notification->fresh(['review'])
+                'data' => $notification->fresh(['review'])
             ]);
 
         } catch (\Exception $e) {
@@ -242,7 +273,8 @@ class NotificationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Marked {$updatedCount} notifications as read"
+                'message' => "Marked {$updatedCount} notifications as read",
+                'updated_count' => $updatedCount
             ]);
 
         } catch (\Exception $e) {
@@ -303,7 +335,8 @@ class NotificationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Deleted {$deletedCount} read notifications"
+                'message' => "Deleted {$deletedCount} read notifications",
+                'deleted_count' => $deletedCount
             ]);
 
         } catch (\Exception $e) {

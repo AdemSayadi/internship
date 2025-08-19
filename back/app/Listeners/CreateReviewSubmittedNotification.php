@@ -1,4 +1,5 @@
 <?php
+// Updated App\Listeners\CreateReviewSubmittedNotification.php
 
 namespace App\Listeners;
 
@@ -16,7 +17,14 @@ class CreateReviewSubmittedNotification
             Notification::create([
                 'user_id' => $codeSubmission->user_id,
                 'review_id' => $event->review->id,
-                'message' => "A new review has been submitted for your code submission: {$codeSubmission->title}.",
+                'type' => Notification::TYPE_REVIEW_SUBMITTED, // Use constant instead of string
+                'title' => 'Review Started',
+                'message' => "A review has been started for your code submission: {$codeSubmission->title}.",
+                'data' => [
+                    'review_id' => $event->review->id,
+                    'code_submission_id' => $event->review->code_submission_id,
+                    'title' => $codeSubmission->title,
+                ],
                 'read' => false,
             ]);
 
@@ -27,7 +35,6 @@ class CreateReviewSubmittedNotification
         } catch (\Exception $e) {
             Log::error('Failed to create notification for review submitted', [
                 'review_id' => $event->review->id,
-                'user_id' => $codeSubmission->user_id,
                 'error' => $e->getMessage(),
             ]);
         }

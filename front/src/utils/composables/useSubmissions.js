@@ -195,10 +195,6 @@ export const useSubmissions = () => {
 
     const deleteSubmission = async (id) => {
         try {
-            // Add confirmation dialog
-            if (!confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
-                return;
-            }
 
             const data = await apiRequest(`/code-submissions/${id}`, {
                 method: 'DELETE'

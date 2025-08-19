@@ -31,6 +31,7 @@ Route::prefix('auth')->group(function () {
     // GitHub OAuth routes
     Route::get('/github', [AuthController::class, 'redirectToGithub']);
 });
+
 // Public webhook endpoint (no authentication required)
 Route::post('/webhooks/github', [GitHubWebhookController::class, 'handle']);
 
@@ -62,7 +63,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('code-submissions', CodeSubmissionController::class);
     Route::get('code-submissions/{id}/reviews', [CodeSubmissionController::class, 'reviews']);
 
-
     // Pull Request management
     Route::prefix('pull-requests')->group(function () {
         Route::get('/', [PullRequestController::class, 'index']);
@@ -78,55 +78,42 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('reviews', ReviewController::class);
     Route::get('reviews/statistics', [ReviewController::class, 'statistics']);
 
-    // Notification management
-    Route::apiResource('notifications', NotificationController::class);
-    Route::patch('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-    Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
-    Route::delete('notifications/clear-read', [NotificationController::class, 'clearRead']);
+    // Notification management - MOVED OUT OF TEST GROUP
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('/recent', [NotificationController::class, 'recent']);
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::get('/{id}', [NotificationController::class, 'show']);
+        Route::post('/', [NotificationController::class, 'store']);
+        Route::patch('/{id}', [NotificationController::class, 'update']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+        Route::patch('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('/clear-read', [NotificationController::class, 'clearRead']);
+    });
 
     // Dashboard/Statistics routes
-//    Route::prefix('dashboard')->group(function () {
-//        Route::get('/stats', function () {
-//            $user = auth()->user();
-//            return response()->json([
-//                'success' => true,
-//                'stats' => [
-//                    'repositories' => $user->repositories()->count(),
-//                    'submissions' => $user->codeSubmissions()->count(),
-//                    'pull_requests' => \App\Models\PullRequest::whereHas('repository', function ($q) use ($user) {
-//                        $q->where('user_id', $user->id);
-//                    })->count(),
-//                    'reviews' => $user->codeSubmissions()->withCount('reviews')->get()->sum('reviews_count'),
-//                    'notifications' => $user->notifications()->where('read', false)->count(),
-//                ]
-//            ]);
-//        });
-//    });
-
     Route::prefix('dashboard')->group(function () {
         Route::get('/stats', [DashboardController::class, 'stats']);
     });
 
-        // AI Review Routes
-        Route::prefix('ai-review')->group(function () {
-            // Code Submissions
-            Route::post('code-submissions/{codeSubmission}/review', [AIReviewController::class, 'reviewCodeSubmission']);
-            Route::get('code-submissions/{codeSubmission}/review', [AIReviewController::class, 'getCodeSubmissionReview']);
-            Route::post('code-submissions/batch-review', [AIReviewController::class, 'batchReviewCodeSubmissions']);
+    // AI Review Routes
+    Route::prefix('ai-review')->group(function () {
+        // Code Submissions
+        Route::post('code-submissions/{codeSubmission}/review', [AIReviewController::class, 'reviewCodeSubmission']);
+        Route::get('code-submissions/{codeSubmission}/review', [AIReviewController::class, 'getCodeSubmissionReview']);
+        Route::post('code-submissions/batch-review', [AIReviewController::class, 'batchReviewCodeSubmissions']);
 
-            // Pull Requests
-            Route::post('pull-requests/{pullRequest}/review', [AIReviewController::class, 'reviewPullRequest']);
-            Route::get('pull-requests/{pullRequest}/reviews', [AIReviewController::class, 'getPullRequestReview']);
-            Route::get('pull-requests/{pullRequest}/ai-review', [AIReviewController::class, 'getAIReview']);
+        // Pull Requests
+        Route::post('pull-requests/{pullRequest}/review', [AIReviewController::class, 'reviewPullRequest']);
+        Route::get('pull-requests/{pullRequest}/reviews', [AIReviewController::class, 'getPullRequestReview']);
+        Route::get('pull-requests/{pullRequest}/ai-review', [AIReviewController::class, 'getAIReview']);
 
-            // Statistics
-            Route::get('stats', [AIReviewController::class, 'getReviewStats']);
-        });
+        // Statistics
+        Route::get('stats', [AIReviewController::class, 'getReviewStats']);
     });
 
-
-// Test routes for development and debugging
-    Route::middleware('auth:sanctum')->prefix('test')->group(function () {
+    // Test routes for development and debugging
+    Route::prefix('test')->group(function () {
 
         // Test 4: Java Sample Submission (object-oriented example)
         Route::post('create-sample-submission', function () {
@@ -146,33 +133,33 @@ Route::middleware('auth:sanctum')->group(function () {
             $submission = \App\Models\CodeSubmission::create([
                 'title' => 'Java Student Grade Calculator',
                 'language' => 'java',
-                'code_content' => 'import java.util.*;
+                'code_content' => '
+                        import java.util.*;
+                        class Student {
+                            String name;
+                            List<Integer> grades;
 
-class Student {
-    String name;
-    List<Integer> grades;
+                            public Student(String name, List<Integer> grades) {
+                                this.name = name;
+                                this.grades = grades;
+                            }
 
-    public Student(String name, List<Integer> grades) {
-        this.name = name;
-        this.grades = grades;
-    }
+                            public double averageGrade() {
+                                return grades.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+                            }
 
-    public double averageGrade() {
-        return grades.stream().mapToInt(Integer::intValue).average().orElse(0.0);
-    }
+                            public String getResult() {
+                                double avg = averageGrade();
+                                return avg >= 60 ? "Pass" : "Fail";
+                            }
+                        }
 
-    public String getResult() {
-        double avg = averageGrade();
-        return avg >= 60 ? "Pass" : "Fail";
-    }
-}
-
-public class Main {
-    public static void main(String[] args) {
-        Student s = new Student("Alice", Arrays.asList(75, 82, 91, 68));
-        System.out.println(s.name + " => " + s.getResult());
-    }
-}',
+                        public class Main {
+                            public static void main(String[] args) {
+                                Student s = new Student("Alice", Arrays.asList(75, 82, 91, 68));
+                                System.out.println(s.name + " => " + s.getResult());
+                            }
+                        }',
                 'file_path' => 'src/Main.java',
                 'repository_id' => $repository->id,
                 'user_id' => $user->id,
@@ -183,7 +170,6 @@ public class Main {
                 'submission' => $submission
             ]);
         });
-
 
         // Test 2: Trigger AI review manually
         Route::post('trigger-review/{submission}', function (\App\Models\CodeSubmission $submission) {
@@ -374,3 +360,4 @@ function getUserById($id) {
             return response()->json(['message' => 'Test data cleaned up']);
         });
     });
+});
