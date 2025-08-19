@@ -45,9 +45,15 @@ return [
 
     'groq' => [
         'api_key' => env('GROQ_API_KEY'),
-        'timeout' => env('GROQ_TIMEOUT', 30),
-        'retries' => env('GROQ_RETRIES', 3),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
         'model' => env('GROQ_MODEL', 'llama3-70b-8192'),
+        'fallback_model' => env('GROQ_FALLBACK_MODEL', 'llama3-8b-8192'),
+        'rate_limit' => [
+            'per_minute' => env('GROQ_RATE_LIMIT_PER_MINUTE', 30),
+            'per_hour' => env('GROQ_RATE_LIMIT_PER_HOUR', 1000),
+        ],
+        'timeout' => env('GROQ_TIMEOUT', 60),
+        'max_retries' => env('GROQ_MAX_RETRIES', 3),
     ],
 
 

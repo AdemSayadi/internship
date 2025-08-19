@@ -16,17 +16,19 @@ class ProcessPullRequestReview implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    protected PullRequest $pullRequest;
+    public int $tries = 1;
+    public int $maxExceptions = 3;
+    public int $timeout = 300; // 5 minutes
+    public int $backoff = 300; // 5 minutes between retries
 
-    public $timeout = 600; // 10 minutes timeout for PR reviews (multiple files)
-    public $tries = 1;
+    protected PullRequest $pullRequest;
 
     public function __construct(PullRequest $pullRequest)
     {
         $this->pullRequest = $pullRequest;
     }
 
-    public function handle(AICodeReviewService $reviewService): void
+    public function handle(AICodeReviewService $aiService): void
     {
         try {
             Log::info('Starting AI review for pull request', [
@@ -34,16 +36,13 @@ class ProcessPullRequestReview implements ShouldQueue
                 'github_pr_number' => $this->pullRequest->github_pr_number
             ]);
 
-            $review = $reviewService->reviewPullRequest($this->pullRequest);
+            $review = $aiService->reviewPullRequest($this->pullRequest);
 
-            Log::info('AI review completed for pull request', [
+            Log::info('AI review completed successfully', [
                 'pr_id' => $this->pullRequest->id,
                 'review_id' => $review->id,
                 'score' => $review->score
             ]);
-
-            // You can add GitHub comment here if needed
-            // $this->postGitHubComment($review);
 
         } catch (Exception $e) {
             Log::error('Failed to process pull request review', [
@@ -51,6 +50,12 @@ class ProcessPullRequestReview implements ShouldQueue
                 'error' => $e->getMessage(),
                 'attempts' => $this->attempts()
             ]);
+
+            // If it's a rate limit error, release the job back to queue with delay
+            if ($this->isRateLimitError($e)) {
+                $this->release(600); // Release for 10 minutes
+                return;
+            }
 
             throw $e;
         }
@@ -63,18 +68,24 @@ class ProcessPullRequestReview implements ShouldQueue
             'error' => $exception->getMessage()
         ]);
 
-        // Mark any pending review as failed
-        $this->pullRequest->reviews()
-            ->where('status', 'pending')
-            ->update(['status' => 'failed']);
+        // Optionally update the pull request status or notify someone
+        // You might want to create a failed review record here
     }
 
-    /**
-     * Optional: Post review as GitHub comment
-     */
-    private function postGitHubComment($review): void
+    private function isRateLimitError(Exception $e): bool
     {
-        // Implement GitHub API call to post comment
-        // This would require GitHub token and API integration
+        return $e->getCode() === 429 ||
+            str_contains($e->getMessage(), 'Rate limit') ||
+            str_contains($e->getMessage(), '429');
+    }
+
+    // Calculate backoff time dynamically based on attempt number
+    public function backoff(): array
+    {
+        return [
+            300,  // 5 minutes for first retry
+            900,  // 15 minutes for second retry
+            1800, // 30 minutes for third retry
+        ];
     }
 }
