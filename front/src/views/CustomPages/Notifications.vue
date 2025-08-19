@@ -10,14 +10,14 @@
                     label="Mark All Read"
                     icon="pi pi-check"
                     class="p-button-outlined"
-                    @click="markAllAsRead"
+                    @click="handleMarkAllAsRead"
                 />
                 <Button
                     v-if="hasReadNotifications"
                     label="Clear Read"
                     icon="pi pi-trash"
                     class="p-button-outlined p-button-danger"
-                    @click="clearReadNotifications"
+                    @click="handleClearReadNotifications"
                 />
             </div>
 
@@ -114,7 +114,7 @@
                             icon="pi pi-check"
                             class="p-button-text p-button-success p-button-sm"
                             v-tooltip.top="'Mark as read'"
-                            @click="markAsRead(slotProps.data.id)"
+                            @click="handleMarkAsRead(slotProps.data.id)"
                         />
                         <Button
                             icon="pi pi-eye"
@@ -126,7 +126,7 @@
                             icon="pi pi-trash"
                             class="p-button-text p-button-danger p-button-sm"
                             v-tooltip.top="'Delete'"
-                            @click="deleteNotification(slotProps.data.id)"
+                            @click="handleDeleteNotification(slotProps.data.id)"
                         />
                     </div>
                 </template>
@@ -214,7 +214,6 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -229,8 +228,15 @@ const currentFilter = ref('all');
 const showDetailDialog = ref(false);
 const selectedNotification = ref(null);
 const router = useRouter();
-const toast = useToast();
 const { checkAuth } = useAuth();
+
+const baseURL = 'http://localhost:8000/api';
+
+const getAuthHeaders = () => ({
+    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+});
 
 // Computed properties for counts
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length);
@@ -238,10 +244,21 @@ const readCount = computed(() => notifications.value.filter(n => n.read).length)
 const totalCount = computed(() => notifications.value.length);
 const hasReadNotifications = computed(() => readCount.value > 0);
 
+// Toast function
+const showToast = (severity, summary, detail) => {
+    // Simple console log for now - replace with your toast implementation
+    console.log(`${severity.toUpperCase()}: ${summary} - ${detail}`);
+
+    // If you have a global toast service, use it here
+    // For example with PrimeVue:
+    // const toast = useToast();
+    // toast.add({ severity, summary, detail, life: 3000 });
+};
+
 const loadNotifications = async (filter = null) => {
     try {
         loading.value = true;
-        let url = '/api/notifications';
+        let url = `${baseURL}/notifications`;
 
         if (filter === 'unread') {
             url += '?read=false';
@@ -250,26 +267,18 @@ const loadNotifications = async (filter = null) => {
         }
 
         const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Accept': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
 
         if (response.ok) {
             const data = await response.json();
             notifications.value = data.data || data;
         } else {
-            throw new Error('Failed to load notifications');
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
         console.error('Error loading notifications:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to load notifications',
-            life: 3000
-        });
+        showToast('error', 'Error', 'Failed to load notifications');
     } finally {
         loading.value = false;
     }
@@ -280,15 +289,11 @@ const setFilter = (filter) => {
     loadNotifications(filter === 'all' ? null : filter);
 };
 
-const markAsRead = async (id) => {
+const handleMarkAsRead = async (id) => {
     try {
-        const response = await fetch(`/api/notifications/${id}`, {
+        const response = await fetch(`${baseURL}/notifications/${id}`, {
             method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ read: true })
         });
 
@@ -298,32 +303,21 @@ const markAsRead = async (id) => {
                 notification.read = true;
             }
 
-            toast.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: 'Notification marked as read',
-                life: 3000
-            });
+            showToast('success', 'Success', 'Notification marked as read');
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
         console.error('Error:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to mark notification as read',
-            life: 3000
-        });
+        showToast('error', 'Error', 'Failed to mark notification as read');
     }
 };
 
-const markAllAsRead = async () => {
+const handleMarkAllAsRead = async () => {
     try {
-        const response = await fetch('/api/notifications/mark-all-read', {
+        const response = await fetch(`${baseURL}/notifications/mark-all-read`, {
             method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Accept': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
 
         if (response.ok) {
@@ -332,84 +326,53 @@ const markAllAsRead = async () => {
             });
 
             const data = await response.json();
-            toast.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: data.message,
-                life: 3000
-            });
+            showToast('success', 'Success', data.message);
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
         console.error('Error:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to mark all notifications as read',
-            life: 3000
-        });
+        showToast('error', 'Error', 'Failed to mark all notifications as read');
     }
 };
 
-const clearReadNotifications = async () => {
+const handleClearReadNotifications = async () => {
     try {
-        const response = await fetch('/api/notifications/clear-read', {
+        const response = await fetch(`${baseURL}/notifications/clear-read`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Accept': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
 
         if (response.ok) {
             notifications.value = notifications.value.filter(n => !n.read);
 
             const data = await response.json();
-            toast.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: data.message,
-                life: 3000
-            });
+            showToast('success', 'Success', data.message);
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
         console.error('Error:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to clear read notifications',
-            life: 3000
-        });
+        showToast('error', 'Error', 'Failed to clear read notifications');
     }
 };
 
-const deleteNotification = async (id) => {
+const handleDeleteNotification = async (id) => {
     try {
-        const response = await fetch(`/api/notifications/${id}`, {
+        const response = await fetch(`${baseURL}/notifications/${id}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Accept': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
 
         if (response.ok) {
             notifications.value = notifications.value.filter(n => n.id !== id);
-
-            toast.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: 'Notification deleted',
-                life: 3000
-            });
+            showToast('success', 'Success', 'Notification deleted');
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
         console.error('Error:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Error',
-            detail: 'Failed to delete notification',
-            life: 3000
-        });
+        showToast('error', 'Error', 'Failed to delete notification');
     }
 };
 
@@ -419,7 +382,7 @@ const viewNotification = (notification) => {
 };
 
 const markAsReadAndClose = async (id) => {
-    await markAsRead(id);
+    await handleMarkAsRead(id);
     showDetailDialog.value = false;
 };
 
@@ -451,10 +414,10 @@ const formatFullDate = (date) => {
 const formatType = (type) => {
     const typeMap = {
         'code_submission_created': 'Code Submission',
+        'review_submitted': 'Review Started',
         'review_completed': 'Review Done',
         'pull_request_created': 'Pull Request',
-        'pr_review_completed': 'PR Review Done',
-        'review_submitted': 'Review Started'
+        'pr_review_completed': 'PR Review Done'
     };
     return typeMap[type] || type.replace('_', ' ');
 };
@@ -462,10 +425,10 @@ const formatType = (type) => {
 const getTypeStyle = (type) => {
     const styles = {
         'code_submission_created': 'bg-green-100 text-green-800',
+        'review_submitted': 'bg-yellow-100 text-yellow-800',
         'review_completed': 'bg-blue-100 text-blue-800',
         'pull_request_created': 'bg-purple-100 text-purple-800',
-        'pr_review_completed': 'bg-indigo-100 text-indigo-800',
-        'review_submitted': 'bg-yellow-100 text-yellow-800'
+        'pr_review_completed': 'bg-indigo-100 text-indigo-800'
     };
     return styles[type] || 'bg-gray-100 text-gray-800';
 };
