@@ -14,6 +14,7 @@ class CreateCodeSubmissionNotification
         try {
             Notification::create([
                 'user_id' => $event->codeSubmission->user_id,
+                'review_id' => null, // Explicitly set to null
                 'type' => Notification::TYPE_CODE_SUBMISSION_CREATED,
                 'title' => 'Code Submission Created',
                 'message' => "Your code submission '{$event->codeSubmission->title}' has been created and is pending review.",

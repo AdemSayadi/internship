@@ -27,7 +27,7 @@ class Notification extends Model
 
     // Notification types
     const TYPE_CODE_SUBMISSION_CREATED = 'code_submission_created';
-    const TYPE_REVIEW_SUBMITTED = 'review_submitted'; // Added missing constant
+    const TYPE_REVIEW_SUBMITTED = 'review_submitted';
     const TYPE_REVIEW_COMPLETED = 'review_completed';
     const TYPE_PULL_REQUEST_CREATED = 'pull_request_created';
     const TYPE_PR_REVIEW_COMPLETED = 'pr_review_completed';
@@ -70,5 +70,18 @@ class Notification extends Model
             self::TYPE_PULL_REQUEST_CREATED,
             self::TYPE_PR_REVIEW_COMPLETED,
         ];
+    }
+
+    // Boot method to set defaults
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($notification) {
+            // Set review_id to null if not provided
+            if (!isset($notification->review_id)) {
+                $notification->review_id = null;
+            }
+        });
     }
 }

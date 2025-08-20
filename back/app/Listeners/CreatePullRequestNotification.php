@@ -14,6 +14,7 @@ class CreatePullRequestNotification
         try {
             Notification::create([
                 'user_id' => $event->pullRequest->user_id,
+                'review_id' => null, // Explicitly set to null
                 'type' => Notification::TYPE_PULL_REQUEST_CREATED,
                 'title' => 'Pull Request Created',
                 'message' => "Your pull request '{$event->pullRequest->title}' has been created and is ready for review.",

@@ -2,12 +2,16 @@
     <div class="relative">
         <button
             @click="toggleDropdown"
-            class="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            class="relative p-2 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
             :class="{ 'bg-gray-100': showDropdown }"
+            :aria-label="`Notifications. ${unreadCount} unread`"
         >
             <BellIcon class="h-6 w-6 text-gray-600" />
-            <span v-if="unreadCount > 0"
-                  class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+            <span
+                v-if="unreadCount > 0"
+                class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse"
+                :aria-label="`${unreadCount} unread notifications`"
+            >
                 {{ unreadCount > 99 ? '99+' : unreadCount }}
             </span>
         </button>
@@ -21,43 +25,73 @@
             leave-from-class="opacity-100 scale-100"
             leave-to-class="opacity-0 scale-95"
         >
-            <div v-if="showDropdown" class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg z-50 border border-gray-200">
+            <div v-if="showDropdown"
+                 class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg z-50 border border-gray-200"
+                 @click.stop>
                 <!-- Header -->
                 <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-medium text-gray-900">Notifications</h3>
-                        <button
-                            v-if="unreadCount > 0"
-                            @click="markAllAsRead"
-                            class="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                            Mark all read
+                        <div class="flex items-center gap-2">
+                            <button
+                                v-if="unreadCount > 0"
+                                @click="markAllAsRead"
+                                class="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                :disabled="markingAllRead"
+                            >
+                                {{ markingAllRead ? 'Marking...' : 'Mark all read' }}
+                            </button>
+                            <button
+                                @click="refreshNotifications"
+                                class="text-gray-400 hover:text-gray-600 p-1 rounded"
+                                :disabled="loading"
+                                title="Refresh notifications"
+                            >
+                                <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': loading }" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div v-if="error" class="px-4 py-3 bg-red-50 border-b border-red-200">
+                    <div class="flex items-center gap-2 text-red-600 text-sm">
+                        <ExclamationTriangleIcon class="h-4 w-4" />
+                        <span>{{ error }}</span>
+                        <button @click="refreshNotifications" class="ml-auto text-red-700 hover:text-red-900 text-xs">
+                            Retry
                         </button>
                     </div>
                 </div>
 
                 <!-- Loading State -->
-                <div v-if="loading" class="px-4 py-8 text-center">
-                    <div class="animate-spin inline-block w-6 h-6 border-[3px] border-current border-t-transparent text-blue-600 rounded-full" role="status" aria-label="loading">
+                <div v-if="loading && notifications.length === 0" class="px-4 py-8 text-center">
+                    <div class="animate-spin inline-block w-6 h-6 border-[3px] border-current border-t-transparent text-blue-600 rounded-full"
+                         role="status" aria-label="loading">
                         <span class="sr-only">Loading...</span>
                     </div>
                     <p class="text-sm text-gray-500 mt-2">Loading notifications...</p>
                 </div>
 
                 <!-- Empty State -->
-                <div v-else-if="notifications.length === 0" class="px-4 py-8 text-center">
+                <div v-else-if="!loading && notifications.length === 0" class="px-4 py-8 text-center">
                     <BellIcon class="h-8 w-8 text-gray-300 mx-auto mb-2" />
                     <p class="text-sm text-gray-500">No notifications</p>
+                    <p class="text-xs text-gray-400 mt-1">You're all caught up!</p>
                 </div>
 
                 <!-- Notifications List -->
                 <div v-else class="max-h-96 overflow-y-auto">
-                    <div v-for="notification in notifications" :key="notification.id"
-                         class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                         @click="handleNotificationClick(notification)">
+                    <div
+                        v-for="notification in notifications"
+                        :key="notification.id"
+                        class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors group"
+                        @click="handleNotificationClick(notification)"
+                        :class="{ 'bg-blue-50': !notification.read }"
+                    >
                         <div class="flex items-start gap-3">
                             <!-- Status Indicator -->
-                            <div class="w-2 h-2 rounded-full flex-shrink-0 mt-2"
+                            <div class="w-2 h-2 rounded-full flex-shrink-0 mt-2 transition-colors"
                                  :class="notification.read ? 'bg-gray-300' : 'bg-blue-500'"></div>
 
                             <!-- Content -->
@@ -69,13 +103,27 @@
                                 </span>
 
                                 <!-- Title -->
-                                <h4 class="font-medium text-sm text-gray-900 truncate">{{ notification.title }}</h4>
+                                <h4 class="font-medium text-sm text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                                    {{ notification.title }}
+                                </h4>
 
                                 <!-- Message -->
                                 <p class="text-sm text-gray-600 line-clamp-2 mt-1">{{ notification.message }}</p>
 
                                 <!-- Time -->
                                 <p class="text-xs text-gray-400 mt-1">{{ formatDate(notification.created_at) }}</p>
+                            </div>
+
+                            <!-- Quick actions (shown on hover) -->
+                            <div class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    v-if="!notification.read"
+                                    @click.stop="markSingleAsRead(notification.id)"
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded text-xs"
+                                    title="Mark as read"
+                                >
+                                    <CheckIcon class="h-4 w-4" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -85,10 +133,11 @@
                 <div class="border-t border-gray-200 px-4 py-3 bg-gray-50 rounded-b-lg">
                     <router-link
                         to="/notifications"
-                        class="text-blue-600 text-sm hover:text-blue-800 font-medium transition-colors"
+                        class="text-blue-600 text-sm hover:text-blue-800 font-medium transition-colors inline-flex items-center gap-1"
                         @click="showDropdown = false"
                     >
-                        View all notifications →
+                        View all notifications
+                        <ArrowRightIcon class="h-4 w-4" />
                     </router-link>
                 </div>
             </div>
@@ -100,28 +149,47 @@
 </template>
 
 <script>
-import { BellIcon } from '@heroicons/vue/24/outline'
+import {
+    BellIcon,
+    ArrowPathIcon,
+    ExclamationTriangleIcon,
+    CheckIcon,
+    ArrowRightIcon
+} from '@heroicons/vue/24/outline'
 import notificationService from '@/utils/services/NotificationService'
 
 export default {
     name: 'NotificationsDropdown',
-    components: { BellIcon },
+    components: {
+        BellIcon,
+        ArrowPathIcon,
+        ExclamationTriangleIcon,
+        CheckIcon,
+        ArrowRightIcon
+    },
     data() {
         return {
             showDropdown: false,
             notifications: [],
             unreadCount: 0,
             loading: false,
+            error: null,
+            markingAllRead: false,
             unsubscribe: null
         }
     },
     async mounted() {
-        // Subscribe to notification service updates
-        this.unsubscribe = notificationService.subscribe(this.handleServiceUpdate)
+        try {
+            // Subscribe to notification service updates
+            this.unsubscribe = notificationService.subscribe(this.handleServiceUpdate)
 
-        // Start polling and load initial data
-        notificationService.startPolling()
-        await this.loadInitialData()
+            // Start polling and load initial data
+            notificationService.startPolling()
+            await this.loadInitialData()
+        } catch (error) {
+            this.error = 'Failed to initialize notifications'
+            console.error('Notification initialization error:', error)
+        }
     },
     beforeUnmount() {
         // Clean up
@@ -134,6 +202,8 @@ export default {
         async loadInitialData() {
             try {
                 this.loading = true
+                this.error = null
+
                 const [notifications, count] = await Promise.all([
                     notificationService.getRecentNotifications(),
                     notificationService.getUnreadCount()
@@ -144,6 +214,29 @@ export default {
                 notificationService.lastUnreadCount = count
             } catch (error) {
                 console.error('Error loading initial notification data:', error)
+                this.error = 'Failed to load notifications'
+            } finally {
+                this.loading = false
+            }
+        },
+
+        async refreshNotifications() {
+            if (this.loading) return
+
+            try {
+                this.loading = true
+                this.error = null
+
+                if (this.showDropdown) {
+                    // If dropdown is open, refresh the list
+                    this.notifications = await notificationService.getRecentNotifications()
+                }
+
+                this.unreadCount = await notificationService.getUnreadCount()
+                notificationService.lastUnreadCount = this.unreadCount
+            } catch (error) {
+                console.error('Error refreshing notifications:', error)
+                this.error = 'Failed to refresh notifications'
             } finally {
                 this.loading = false
             }
@@ -153,7 +246,14 @@ export default {
             switch (type) {
                 case 'new_notifications':
                     this.unreadCount = data.count
-                    this.refreshNotifications()
+                    // Show a subtle notification for new notifications
+                    if (data.newCount > 0) {
+                        this.showNewNotificationFeedback(data.newCount)
+                    }
+                    // Refresh the list if dropdown is open
+                    if (this.showDropdown) {
+                        this.refreshNotificationsList()
+                    }
                     break
                 case 'notification_read':
                     this.updateNotificationRead(data.id)
@@ -167,13 +267,17 @@ export default {
             }
         },
 
-        async refreshNotifications() {
-            if (!this.showDropdown) {
-                try {
-                    this.notifications = await notificationService.getRecentNotifications()
-                } catch (error) {
-                    console.error('Error refreshing notifications:', error)
-                }
+        showNewNotificationFeedback(count) {
+            // You could show a toast notification here
+            // For now, just console.log
+            console.log(`${count} new notification${count > 1 ? 's' : ''} received`)
+        },
+
+        async refreshNotificationsList() {
+            try {
+                this.notifications = await notificationService.getRecentNotifications()
+            } catch (error) {
+                console.error('Error refreshing notification list:', error)
             }
         },
 
@@ -203,8 +307,10 @@ export default {
         async toggleDropdown() {
             this.showDropdown = !this.showDropdown
             if (this.showDropdown) {
+                // Clear any errors when opening
+                this.error = null
                 // Refresh notifications when opening dropdown
-                await this.refreshNotifications()
+                await this.refreshNotificationsList()
             }
         },
 
@@ -222,6 +328,16 @@ export default {
                 this.showDropdown = false
             } catch (error) {
                 console.error('Error handling notification click:', error)
+                this.error = 'Failed to process notification'
+            }
+        },
+
+        async markSingleAsRead(id) {
+            try {
+                await notificationService.markAsRead(id)
+            } catch (error) {
+                console.error('Error marking notification as read:', error)
+                this.error = 'Failed to mark as read'
             }
         },
 
@@ -232,13 +348,13 @@ export default {
             switch (type) {
                 case 'code_submission_created':
                     if (data.code_submission_id) {
-                        this.$router.push(`/code-submissions/${data.code_submission_id}`)
+                        this.$router.push(`/submissions/${data.code_submission_id}`)
                     }
                     break
                 case 'review_submitted':
                 case 'review_completed':
                     if (data.code_submission_id) {
-                        this.$router.push(`/code-submissions/${data.code_submission_id}`)
+                        this.$router.push(`/submissions/${data.code_submission_id}`)
                     } else if (data.review_id) {
                         this.$router.push(`/reviews/${data.review_id}`)
                     }
@@ -257,11 +373,18 @@ export default {
         },
 
         async markAllAsRead() {
+            if (this.markingAllRead || this.unreadCount === 0) return
+
             try {
+                this.markingAllRead = true
+                this.error = null
                 await notificationService.markAllAsRead()
                 // Success feedback will be handled by the service notification
             } catch (error) {
                 console.error('Error marking all as read:', error)
+                this.error = 'Failed to mark all as read'
+            } finally {
+                this.markingAllRead = false
             }
         },
 
@@ -304,5 +427,10 @@ export default {
 
 .max-h-96::-webkit-scrollbar-thumb:hover {
     background: #a1a1a1;
+}
+
+/* Smooth animations for notification items */
+.group {
+    transition: all 0.15s ease-in-out;
 }
 </style>
