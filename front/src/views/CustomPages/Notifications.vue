@@ -9,14 +9,14 @@
                     v-if="unreadCount > 0"
                     label="Mark All Read"
                     icon="pi pi-check"
-                    class="p-button-outlined"
+                    class="p-button-text"
                     @click="handleMarkAllAsRead"
                 />
                 <Button
                     v-if="hasReadNotifications"
                     label="Clear Read"
                     icon="pi pi-trash"
-                    class="p-button-outlined p-button-danger"
+                    class="p-button-text p-button-danger"
                     @click="handleClearReadNotifications"
                 />
             </div>
@@ -25,17 +25,17 @@
             <div class="flex gap-2">
                 <Button
                     :label="`All (${totalCount})`"
-                    :class="currentFilter === 'all' ? 'p-button-primary' : 'p-button-outlined'"
+                    :class="currentFilter === 'all' ? 'p-button-primary' : 'p-button-text'"
                     @click="setFilter('all')"
                 />
                 <Button
                     :label="`Unread (${unreadCount})`"
-                    :class="currentFilter === 'unread' ? 'p-button-primary' : 'p-button-outlined'"
+                    :class="currentFilter === 'unread' ? 'p-button-primary' : 'p-button-text'"
                     @click="setFilter('unread')"
                 />
                 <Button
                     :label="`Read (${readCount})`"
-                    :class="currentFilter === 'read' ? 'p-button-primary' : 'p-button-outlined'"
+                    :class="currentFilter === 'read' ? 'p-button-primary' : 'p-button-text'"
                     @click="setFilter('read')"
                 />
             </div>
@@ -43,6 +43,7 @@
 
         <!-- Notifications Table -->
         <DataTable
+            v-if="!loading && notifications.length > 0"
             :value="notifications"
             class="mt-8"
             :paginator="true"
