@@ -3,7 +3,7 @@
         <PageHeader title="Notifications" subtitle="Stay updated with your code review notifications." />
 
         <!-- Action buttons -->
-        <div class="mt-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div v-if="!loading && notifications.length > 0" class="mt-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center" >
             <div class="flex gap-2">
                 <Button
                     v-if="unreadCount > 0"

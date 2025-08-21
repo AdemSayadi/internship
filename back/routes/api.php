@@ -12,6 +12,7 @@ use App\Http\Controllers\PullRequestController;
 use App\Http\Controllers\GitHubWebhookController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Http\Middleware\HandleCors;
+use App\Http\Controllers\HomeStatsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,10 @@ use Illuminate\Http\Middleware\HandleCors;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+//Home page stats
+Route::get('/stats', [HomeStatsController::class, 'index']);
+
 
 // Public authentication routes
 Route::prefix('auth')->group(function () {
